@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-inter), var(--font-arabic), ui-sans-serif, system-ui, sans-serif;
+
+  --color-navy-50: #f1f5fb;
+  --color-navy-100: #dfe8f5;
+  --color-navy-200: #bfd0ea;
+  --color-navy-300: #93afd9;
+  --color-navy-400: #6286c2;
+  --color-navy-500: #3f65a8;
+  --color-navy-600: #2d4e8c;
+  --color-navy-700: #243f72;
+  --color-navy-800: #1b2f56;
+  --color-navy-900: #12213e;
+  --color-navy-950: #0b1528;
+
+  --color-accent-50: #fff6ed;
+  --color-accent-100: #ffead4;
+  --color-accent-200: #ffd0a8;
+  --color-accent-400: #fd8f45;
+  --color-accent-500: #f97316;
+  --color-accent-600: #e15d0a;
+  --color-accent-700: #b9460b;
+
+  /* Severity colours (also used by floor-plan markers in Stage 3) */
+  --color-sev-critical: #dc2626;
+  --color-sev-high: #ea580c;
+  --color-sev-medium: #eab308;
+  --color-sev-low: #2563eb;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html[dir="rtl"] body {
+  font-family: var(--font-arabic), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: #f7f9fc;
+  color: var(--color-navy-950);
+}
+
+/* Mirror directional icons in RTL */
+html[dir="rtl"] .flip-rtl {
+  transform: scaleX(-1);
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-navy-100 bg-white shadow-[0_1px_2px_rgba(18,33,62,0.04)];
+  }
+  .field-label {
+    @apply mb-1.5 block text-sm font-medium text-navy-800;
+  }
+  .field-input {
+    @apply block w-full rounded-xl border border-navy-200 bg-white px-3.5 py-2.5 text-[15px] text-navy-950 placeholder:text-navy-300 transition outline-none focus:border-navy-500 focus:ring-4 focus:ring-navy-100 disabled:bg-navy-50 disabled:text-navy-400;
+  }
+  .field-input[aria-invalid="true"] {
+    @apply border-red-400 focus:border-red-500 focus:ring-red-100;
+  }
+  .field-error {
+    @apply mt-1 text-sm text-red-600;
+  }
+}

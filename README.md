@@ -1,0 +1,120 @@
+# SNAGIT — Property Inspection & Snagging
+
+SNAGIT helps apartment buyers, owners, inspectors and civil engineers inspect newly delivered units room by room, record construction defects with photos, and track each defect until it is fixed. Arabic (RTL) and English.
+
+**Status:** Stages 1–3 of 7 are built (see [Roadmap](#roadmap)). PDF reports, the AI assistant, payments and the admin panel are not built yet. No page links to them.
+
+## Stack
+
+| Layer | Choice |
+|---|---|
+| Frontend | Next.js 16 (App Router, Server Actions, Turbopack), React 19, TypeScript |
+| Styling | Tailwind CSS 4, lucide-react icons, Inter + IBM Plex Sans Arabic |
+| Backend | Supabase: Postgres, Auth, Storage, Row Level Security |
+| Validation | zod (server side, every action) |
+| Tests | Node test runner + PGlite (real Postgres in-process) for schema and RLS |
+
+## What works today (Stages 1–3)
+
+- **Auth:** email + password sign-up and sign-in, Google sign-in (once enabled in Supabase), password reset by e-mail, change password, sign out. Account types: *Individual* and *Professional Inspector*. *Administrator* can only be granted in SQL.
+- **Profile settings:** name, phone, company, account type, language.
+- **Dashboard:** totals (projects, active, completed, defects, critical + high), recently updated project cards with location, date, defect count, completion % and status. Empty state includes **Load sample project**, which creates a realistic 3-bedroom unit in 6th of October City with 8 defects.
+- **New inspection wizard (4 steps):** project, unit, inspection, floor plan. Floor-plan upload accepts PDF, PNG or JPG up to 15 MB. Rooms are generated from the bedroom, bathroom and balcony counts.
+- **Inspection workspace:** progress (passed / failed / not inspected), rooms grid with per-room progress and open defects, add or delete rooms, defects by severity, floor-plan preview, property details, general remarks (auto-saved), mark completed / reopen, delete inspection (removes its files too).
+- **Room checklist:** bilingual default items per room type (architectural, electrical, plumbing, mechanical). Each item can be marked Passed, Failed or Not inspected, take notes, or be removed. Users can add custom items and custom categories. A failed item becomes a defect in one tap, with the title, room, category and notes prefilled.
+- **Defects:** title, description, category, room, exact spot, severity (Critical / High / Medium / Low), status (Open, Under correction, Pending reinspection, Resolved, Rejected), recommended action, date identified, responsible party. Defects are numbered D-1, D-2… automatically. The defect list can be filtered by severity, status and room, and sorted.
+- **Photos:** several before photos when registering a defect, and before or after photos added later. Photos are resized in the browser (max 2048 px JPEG, which also strips EXIF/GPS data) and shown side by side for before/after comparison.
+- **Reinspection:** update the status, correction date and reinspection notes for each defect.
+- **Floor plan (Stage 3):** a Floor plan tab per inspection. Zoom with the mouse wheel, a two-finger pinch or the +/− buttons, and drag to pan. Tap the plan to create a new defect at that spot, or to pin an existing one there. Markers show the defect number in its severity colour (red critical, orange high, yellow medium, blue low) and keep the same size at any zoom. Tapping a marker opens a card with Open / Move / Remove pin. Resolved defects are faded with a check mark and can be hidden. A "Not on the plan yet" list lets you pin defects one by one. PDF plans are rendered to an image (page 1) in the browser on upload, and the original PDF stays downloadable. The plan can be replaced, and pins keep their relative position. Each defect page shows a mini map of its location with "View on plan" / "Pin on plan". Without a plan, a **room layout** shows every room coloured by its worst open defect, with shortcuts to the checklist and "add defect".
+- **Security:** RLS on every table means a user only ever reads or writes their own rows. Storage buckets are private and every file sits under `<user_id>/…`, enforced by storage policies. MIME types and size limits are enforced by Storage itself. Photos are served through signed URLs that expire after 1 hour. The browser only ever gets the anon key.
+- **UX:** mobile-first layout with a bottom nav on phones, full RTL, loading skeletons, empty states, an error boundary and a 404 page.
+
+## Setup
+
+### 1. Supabase project
+1. Create a project at [supabase.com](https://supabase.com). The free tier is fine.
+2. In **SQL Editor**, run these files in order:
+   - `supabase/migrations/0001_init.sql`: tables, enums, triggers, the RLS policies, private storage buckets.
+   - `supabase/migrations/0002_checklist_templates.sql`: default bilingual checklist.
+   - `supabase/migrations/0003_floor_plan_mapping.sql`: floor-plan image columns and the pin constraint (Stage 3).
+3. Under **Authentication → URL Configuration**:
+   - Site URL: `http://localhost:3000` (your production URL later)
+   - Redirect URLs: `http://localhost:3000/auth/callback` (plus the production equivalent)
+4. **Email templates** (recommended, so reset links also work when opened in a different browser or the mail app): under **Authentication → Emails**, change the link in **Reset password** to
+   `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=recovery&next=/reset-password`
+   and in **Confirm signup** to
+   `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=signup&next=/dashboard`.
+   Without this, Supabase's default links only work in the browser that requested them.
+5. *(Optional)* Google sign-in: **Authentication → Providers → Google**. Add an OAuth client from Google Cloud Console. Its authorised redirect URI is the one Supabase shows.
+6. *(Optional)* To skip e-mail confirmation while developing: **Authentication → Providers → Email → Confirm email** off.
+
+### 2. Run locally
+```bash
+npm install
+cp .env.example .env.local   # then fill NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
+npm run dev                  # http://localhost:3000
+```
+Without the env values the app still starts and shows a "Connect Supabase" screen.
+
+### 3. Make yourself an admin (for later stages)
+```sql
+update public.profiles set role = 'admin' where id = (select id from auth.users where email = 'you@example.com');
+```
+
+## Scripts
+| Command | What it does |
+|---|---|
+| `npm run dev` | Dev server |
+| `npm run build` / `npm start` | Production build / serve |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | Generates route types, runs `tsc` |
+| `npm run test:db` | Runs both migrations on in-process Postgres and checks the triggers, numbering, summary view, RLS isolation and storage rules |
+
+## Deployment (Vercel)
+1. Push the repo to GitHub and import it in Vercel. The framework preset is Next.js.
+2. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `NEXT_PUBLIC_SITE_URL` (the production URL).
+3. In Supabase, add `https://<your-domain>/auth/callback` to Redirect URLs and set the Site URL.
+4. Deploy. No other server is needed: everything else is Supabase.
+
+Any Node 20+ host that runs `next start` works too.
+
+## Database schema
+
+```
+auth.users ─1:1─ profiles (role, locale)
+profiles ─1:n─ properties ─1:n─ inspections ─┬─1:n─ rooms ─1:n─ checklist_items
+                                             ├─1:n─ defects ─1:n─ defect_photos (before/after)
+                                             └─1:n─ reports (Stage 4, versioned)
+checklist_templates (global, admin-managed) → copied into checklist_items when a room is created
+view inspection_summaries (security_invoker) → dashboard and workspace counts
+```
+- Every child table has an `owner_id` (default `auth.uid()`), so each RLS check is a single comparison. Write policies also check that the parent row belongs to the same user.
+- `defects.number` is assigned per inspection by a trigger, with an advisory lock so concurrent inserts can't collide.
+- `defects.plan_x` and `plan_y` hold the marker position as a fraction (0–1) of the plan image, so pins survive any display size or a higher-resolution replacement plan. Both are set or both are null.
+- `properties.floor_plan_image_path` (+ width/height) is the image shown and pinned. For a PDF upload it's page 1 rendered to PNG; for an image it's the original file.
+- Storage buckets: `floor-plans` (15 MB; PDF, PNG, JPG, WebP), `defect-photos` (10 MB; JPG, PNG, WebP), `reports` (Stage 4). All are private.
+
+## Features that need external credentials
+
+| Feature | Needs | Stage |
+|---|---|---|
+| Everything in the app | Supabase URL + anon key | 1 |
+| Google sign-in | Google OAuth client set up in Supabase | 1 |
+| Production e-mails (confirm, reset) | Custom SMTP in Supabase (the built-in sender is rate-limited) | 1 |
+| AI defect assistant | Vision-capable model API key (server-only) | 5 |
+| Subscriptions / pay-per-report | Payment provider keys. Paymob or Fawry suit Egypt; Stripe works elsewhere. Test mode until live keys exist | 6 |
+| Admin jobs, PDF storage cleanup | `SUPABASE_SERVICE_ROLE_KEY` (server-only) | 4, 7 |
+
+## Roadmap
+
+| Stage | Scope | Status |
+|---|---|---|
+| 1 | Auth, database, dashboard, property creation | Done |
+| 2 | Room inspections, checklists, defects, photo uploads | Done |
+| 3 | Interactive floor plan: tap to pin defects, zoom, severity colours, room layout fallback | Done |
+| 4 | Server-side PDF reports (EN/AR, RTL, cover, summary, photos, numbered plan, signatures, versions) | Next |
+| 5 | AI defect assistant (suggestions are always labelled preliminary and need human confirmation) | |
+| 6 | Plans (Free / Pro annual / pay-per-report), payment integration in test mode, feature limits | |
+| 7 | Admin dashboard, sharing, security review, E2E tests, deployment hardening | |
+
+See `docs/decisions.md` for the main technical decisions and `CHANGELOG.md` for changes.
