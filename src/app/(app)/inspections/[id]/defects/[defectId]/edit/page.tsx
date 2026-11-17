@@ -5,13 +5,14 @@ import { requireUser } from "@/lib/auth";
 import { getCategories, getDefect, getInspection } from "@/lib/data";
 import { roomLabel } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n/server";
+import { isAiEnabled } from "@/lib/ai/defect-assistant";
 import { DefectForm } from "../../defect-form";
 
 export const metadata: Metadata = { title: "Edit defect" };
 
 export default async function EditDefectPage({ params }: PageProps<"/inspections/[id]/defects/[defectId]/edit">) {
   const { id, defectId } = await params;
-  const [user, { rooms }, categories, { defect }, { t }] = await Promise.all([
+  const [user, { rooms }, categories, { defect, photos }, { t }] = await Promise.all([
     requireUser(),
     getInspection(id),
     getCategories(id),
@@ -34,6 +35,8 @@ export default async function EditDefectPage({ params }: PageProps<"/inspections
         inspectionId={id}
         userId={user.id}
         defectId={defectId}
+        aiEnabled={isAiEnabled()}
+        storedPhotoCount={photos.length}
         rooms={rooms.map((r) => ({ id: r.id, label: roomLabel(r, t) }))}
         categories={categories}
         initial={{

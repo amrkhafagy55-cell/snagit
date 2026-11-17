@@ -20,6 +20,11 @@ Short records of decisions that shape the codebase. Add a new entry rather than 
 **Decision:** Templates and checklist items store both `title_en` and `title_ar`. UI strings live in `src/lib/i18n/{en,ar}.ts`; `ar` is typed against `en`, so a missing key fails the build. The language lives in a cookie and is mirrored to `profiles.locale`.
 **Consequence:** Reports (Stage 4) can render in either language whatever language the inspection was done in. Custom items store the user's text in both fields.
 
+## D-008 — AI assistant: one structured call, human applies each field (2026-11-18)
+**Decision:** A single `client.beta.messages.parse` call to `claude-opus-5-5` (effort `medium`, adaptive thinking) returns a Zod-validated suggestion. `fallbacks: "default"` (beta `server-side-fallback-2026-07-01`) retries a safety-classifier decline on Anthropic's recommended model. The key lives only on the server, the feature is hidden without it, and every call is logged with a per-user daily cap that fails closed if the log table is missing.
+**Why:** The spec requires suggestions to be preliminary and human-confirmed. A per-field "Use" button plus a normal Save keeps the person in control. One call keeps latency (~10–20 s) and cost (~$0.03–0.05) predictable.
+**Consequences:** No AI flag is stored on the defect yet: accepted text becomes the user's text. Costs depend on the Anthropic account. Stage 6 can tie the daily cap to the plan.
+
 ## D-007 — PDF reports via headless Chromium (2026-11-18)
 **Decision:** The report is HTML/CSS rendered to PDF by Chromium (`puppeteer-core`) on the server. Locally it uses the installed Chrome/Edge; on Vercel/Lambda it uses `@sparticuz/chromium`. Fonts (Inter, IBM Plex Sans Arabic) and images are embedded as data URIs, and request interception blocks every non-`data:` request.
 **Why:** It's the only option tested that shapes Arabic and lays out RTL correctly, and it gives vector text, CSS print layout and page numbers. pdfkit, pdfmake and react-pdf don't shape Arabic or handle bidi reliably.

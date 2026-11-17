@@ -12,10 +12,14 @@ export function validatePhoto(file: File): "fileType" | "fileTooBig" | null {
   return null;
 }
 
-/** Downscale to MAX_EDGE and re-encode as JPEG (also strips EXIF/GPS metadata). */
-export async function preparePhoto(file: File): Promise<{ blob: Blob; width: number; height: number }> {
+/** Downscale to maxEdge and re-encode as JPEG (also strips EXIF/GPS metadata). */
+export async function preparePhoto(
+  file: Blob,
+  maxEdge = MAX_EDGE,
+  quality = 0.85,
+): Promise<{ blob: Blob; width: number; height: number }> {
   const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
   const width = Math.round(bitmap.width * scale);
   const height = Math.round(bitmap.height * scale);
   const canvas = document.createElement("canvas");
@@ -24,10 +28,21 @@ export async function preparePhoto(file: File): Promise<{ blob: Blob; width: num
   canvas.getContext("2d")!.drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
   const blob = await new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("encode failed"))), "image/jpeg", 0.85),
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("encode failed"))), "image/jpeg", quality),
   );
   if (blob.size > PHOTO_MAX_BYTES) throw new Error("fileTooBig");
   return { blob, width, height };
+}
+
+/** Small JPEG data URI for the AI assistant (vision models don't benefit beyond ~1.3k px). */
+export async function photoForAi(file: File): Promise<string> {
+  const { blob } = await preparePhoto(file, 1280, 0.8);
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
 }
 
 /** Uploads to defect-photos/<user>/<inspection>/<defect>/<uuid>.jpg and returns rows to register. */

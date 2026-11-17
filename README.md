@@ -2,7 +2,7 @@
 
 SNAGIT helps apartment buyers, owners, inspectors and civil engineers inspect newly delivered units room by room, record construction defects with photos, and track each defect until it is fixed. Arabic (RTL) and English.
 
-**Status:** Stages 1–4 of 7 are built (see [Roadmap](#roadmap)). The AI assistant, payments and the admin panel are not built yet. No page links to them.
+**Status:** Stages 1–5 of 7 are built (see [Roadmap](#roadmap)). The AI assistant (Stage 5) is code-complete but hasn't been run against the live API yet, because it needs an Anthropic API key. Payments and the admin panel are not built yet. No page links to them.
 
 ## Stack
 
@@ -14,7 +14,7 @@ SNAGIT helps apartment buyers, owners, inspectors and civil engineers inspect ne
 | Validation | zod (server side, every action) |
 | Tests | Node test runner + PGlite (real Postgres in-process) for schema and RLS |
 
-## What works today (Stages 1–4)
+## What works today (Stages 1–5)
 
 - **Auth:** email + password sign-up and sign-in, Google sign-in (once enabled in Supabase), password reset by e-mail, change password, sign out. Account types: *Individual* and *Professional Inspector*. *Administrator* can only be granted in SQL.
 - **Profile settings:** name, phone, company, account type, language.
@@ -27,6 +27,7 @@ SNAGIT helps apartment buyers, owners, inspectors and civil engineers inspect ne
 - **Reinspection:** update the status, correction date and reinspection notes for each defect.
 - **Floor plan (Stage 3):** a Floor plan tab per inspection. Zoom with the mouse wheel, a two-finger pinch or the +/− buttons, and drag to pan. Tap the plan to create a new defect at that spot, or to pin an existing one there. Markers show the defect number in its severity colour (red critical, orange high, yellow medium, blue low) and keep the same size at any zoom. Tapping a marker opens a card with Open / Move / Remove pin. Resolved defects are faded with a check mark and can be hidden. A "Not on the plan yet" list lets you pin defects one by one. PDF plans are rendered to an image (page 1) in the browser on upload, and the original PDF stays downloadable. The plan can be replaced, and pins keep their relative position. Each defect page shows a mini map of its location with "View on plan" / "Pin on plan". Without a plan, a **room layout** shows every room coloured by its worst open defect, with shortcuts to the checklist and "add defect".
 - **PDF reports (Stage 4):** a Report tab generates a real A4 PDF on the server (headless Chromium) in English or Arabic, with full RTL and correct Arabic shaping. It contains a cover page (logo, project, unit details, inspector, overall assessment, KPIs), an executive summary (severity and room breakdowns, checklist completion), the floor plan with numbered, severity-coloured defect locations, a defect register (description, location, responsible party, recommended action, reinspection notes, before/after photos side by side), room-by-room checklist results, final remarks (observations, recommendations, outstanding defects), signature boxes for inspector and owner, a disclaimer, and page numbers. Every generation is a **new version** stored privately; earlier versions stay downloadable.
+- **AI defect assistant (Stage 5, optional):** in the new/edit defect form, **Analyze photos** (vision) and **Improve wording** return a structured suggestion: title, category, severity with a reason, description, recommended action, possible causes, potentially serious visible issues and checks to do on site. It's always labelled *preliminary*: each field has its own **Use** button, and nothing is saved until the user saves the defect. The prompt forbids claiming a photo proves structural safety or a definitive cause. It runs on `claude-opus-5-5` (structured outputs, `fallbacks: "default"` for safety-classifier declines), server-side only. Every call is logged in `ai_requests`, with a per-user daily limit (`AI_DAILY_LIMIT`, default 30) that fails closed. The assistant is hidden when `ANTHROPIC_API_KEY` isn't set.
 - **Security:** RLS on every table means a user only ever reads or writes their own rows. Storage buckets are private and every file sits under `<user_id>/…`, enforced by storage policies. MIME types and size limits are enforced by Storage itself. Photos are served through signed URLs that expire after 1 hour. The browser only ever gets the anon key.
 - **UX:** mobile-first layout with a bottom nav on phones, full RTL, loading skeletons, empty states, an error boundary and a 404 page.
 
@@ -39,6 +40,7 @@ SNAGIT helps apartment buyers, owners, inspectors and civil engineers inspect ne
    - `supabase/migrations/0002_checklist_templates.sql`: default bilingual checklist.
    - `supabase/migrations/0003_floor_plan_mapping.sql`: floor-plan image columns and the pin constraint (Stage 3).
    - `supabase/migrations/0004_reports.sql`: report version summaries and immutable report rows (Stage 4).
+   - `supabase/migrations/0005_ai_requests.sql`: AI usage log for the daily limit (Stage 5; the assistant refuses to run without it).
 3. Under **Authentication → URL Configuration**:
    - Site URL: `http://localhost:3000` (your production URL later)
    - Redirect URLs: `http://localhost:3000/auth/callback` (plus the production equivalent)
@@ -104,7 +106,7 @@ view inspection_summaries (security_invoker) → dashboard and workspace counts
 | PDF reports | Nothing extra locally (uses the installed Chrome/Edge, or `CHROME_EXECUTABLE_PATH`). On Vercel, `@sparticuz/chromium` is used automatically; give the function ≥1 GB memory | 4 |
 | Google sign-in | Google OAuth client set up in Supabase | 1 |
 | Production e-mails (confirm, reset) | Custom SMTP in Supabase (the built-in sender is rate-limited) | 1 |
-| AI defect assistant | Vision-capable model API key (server-only) | 5 |
+| AI defect assistant | `ANTHROPIC_API_KEY` from console.anthropic.com (server-only, prepaid credits; roughly $0.03–0.05 per analysis of 1–3 photos), plus migration 0005 | 5 |
 | Subscriptions / pay-per-report | Payment provider keys. Paymob or Fawry suit Egypt; Stripe works elsewhere. Test mode until live keys exist | 6 |
 | Admin jobs, PDF storage cleanup | `SUPABASE_SERVICE_ROLE_KEY` (server-only) | 4, 7 |
 
@@ -116,8 +118,8 @@ view inspection_summaries (security_invoker) → dashboard and workspace counts
 | 2 | Room inspections, checklists, defects, photo uploads | Done |
 | 3 | Interactive floor plan: tap to pin defects, zoom, severity colours, room layout fallback | Done |
 | 4 | Server-side PDF reports (EN/AR, RTL, cover, summary, photos, numbered plan, signatures, versions) | Done |
-| 5 | AI defect assistant (suggestions are always labelled preliminary and need human confirmation) | Next |
-| 6 | Plans (Free / Pro annual / pay-per-report), payment integration in test mode, feature limits | |
+| 5 | AI defect assistant (suggestions are always labelled preliminary and need human confirmation) | Built; awaiting API key for live test |
+| 6 | Plans (Free / Pro annual / pay-per-report), payment integration in test mode, feature limits | Next |
 | 7 | Admin dashboard, sharing, security review, E2E tests, deployment hardening | |
 
 See `docs/decisions.md` for the main technical decisions and `CHANGELOG.md` for changes.

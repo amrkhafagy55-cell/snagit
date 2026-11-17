@@ -18,6 +18,7 @@ This folder is **SNAGIT**, a property inspection & snagging SaaS. The `CLAUDE.md
 - Every server action: validate with zod → `authed()` → RLS-scoped client. Never use the service-role key in user flows.
 - New UI text goes into both `en.ts` and `ar.ts`. Use logical CSS (`ms-`/`me-`/`start-`/`end-`) and add `flip-rtl` to directional icons.
 - No fake buttons: don't link to features that don't exist yet.
-- Stages 1–4 are done. Next is Stage 5 (AI defect assistant). Roadmap is in the README.
+- Stages 1–5 are done (Stage 5 still needs a live API test once the user adds ANTHROPIC_API_KEY and runs migration 0005). Next is Stage 6 (plans and payments). Roadmap is in the README.
+- AI: `src/lib/ai/defect-assistant.ts` (model, prompt, schema) + `(app)/_actions/ai.ts` (limits, logging). Load the claude-api skill before changing either; keep the "preliminary, human-confirmed" contract.
 - PDF reports: `src/lib/report/` (collect → html → render). Check a generated report by rendering its pages to PNG (pdf.js + @napi-rs/canvas in a scratch folder) and reading them; never trust layout from code alone.
 - Constants used by server components must not live in a `"use client"` file: the server gets a reference proxy, not the value (see `components/plan/marker-colors.ts`).

@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { getCategories, getChecklistItem, getInspection } from "@/lib/data";
 import { itemTitle, roomLabel, todayIso } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n/server";
+import { isAiEnabled } from "@/lib/ai/defect-assistant";
 import { DefectForm } from "../defect-form";
 
 export const metadata: Metadata = { title: "Register defect" };
@@ -49,6 +50,7 @@ export default async function NewDefectPage({ params, searchParams }: PageProps<
         categories={categories}
         linkedItemTitle={linkedItem ? itemTitle(linkedItem, lang) : undefined}
         returnToPlan={fromPlan}
+        aiEnabled={isAiEnabled()}
         initial={{
           roomId,
           checklistItemId: linkedItem?.id ?? null,

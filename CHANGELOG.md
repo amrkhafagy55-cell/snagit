@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0 — 2026-11-18 — Stage 5: AI defect assistant (optional)
+- "Analyze photos" and "Improve wording" in the new/edit defect form, using Claude Opus 5.5 vision with structured outputs and server-side refusal fallbacks.
+- Suggestions are labelled preliminary, applied field by field with "Use", and only saved when the user saves the defect. Potentially serious visible issues are flagged with a specialist recommendation.
+- Photos are resized to 1280 px in the browser before sending; stored photos are used for existing defects.
+- Usage log `ai_requests` (migration 0005) with a per-user daily limit that fails closed; DB test added (11 tests).
+- Hidden entirely when `ANTHROPIC_API_KEY` isn't configured. Not yet run against the live API (no key).
+
 ## 0.4.0 — 2026-11-18 — Stage 4: PDF reports
 - New **Report** tab: generate an A4 PDF in English or Arabic (RTL) on the server with headless Chromium.
 - Contents: cover, executive summary with overall assessment, floor plan with numbered pins, defect register with before/after photos side by side, room-by-room checklist, final remarks, outstanding defects, signatures, disclaimer, page numbers.

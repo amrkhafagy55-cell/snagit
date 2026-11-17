@@ -14,6 +14,10 @@ const nextConfig: NextConfig = {
       "./node_modules/@sparticuz/chromium/bin/**",
     ],
   },
+  // Server actions carry up to 3 resized photos (~1280 px JPEG) to the AI assistant.
+  experimental: {
+    serverActions: { bodySizeLimit: "4mb" },
+  },
   turbopack: {
     rules: {
       "*.css": {

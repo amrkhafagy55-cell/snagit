@@ -49,6 +49,7 @@ before(async () => {
   await db.exec(readFileSync(new URL("../migrations/0002_checklist_templates.sql", import.meta.url), "utf8"));
   await db.exec(readFileSync(new URL("../migrations/0003_floor_plan_mapping.sql", import.meta.url), "utf8"));
   await db.exec(readFileSync(new URL("../migrations/0004_reports.sql", import.meta.url), "utf8"));
+  await db.exec(readFileSync(new URL("../migrations/0005_ai_requests.sql", import.meta.url), "utf8"));
   await db.query(`insert into auth.users (id, email, raw_user_meta_data) values ($1, 'a@test.dev', $2), ($3, 'b@test.dev', $4)`, [
     A, JSON.stringify({ full_name: "Amina Inspector", account_type: "inspector", locale: "ar" }),
     B, JSON.stringify({ full_name: "Bob", account_type: "admin" }),
@@ -157,6 +158,24 @@ test("report versions: owner adds and reads them, cannot edit, others see nothin
     assert.equal((await one(`select count(*)::int n from public.reports`)).n, 0);
     await assert.rejects(
       db.query(`insert into storage.objects (bucket_id, name) values ('reports', $1)`, [`${A}/steal.pdf`]),
+      /row-level security/,
+    );
+  });
+});
+
+test("AI usage log: users log and count their own requests only", async () => {
+  await as(A, async () => {
+    await db.query(`insert into public.ai_requests (inspection_id, kind, model, input_tokens, output_tokens, image_count) values ($1, 'analyze', 'claude-opus-5-5', 4200, 600, 2)`, [inspectionA]);
+    await db.query(`insert into public.ai_requests (kind) values ('improve')`);
+    const r = await one(`select count(*)::int n from public.ai_requests where created_at > now() - interval '24 hours'`);
+    assert.equal(r.n, 2);
+    const upd = await db.query(`update public.ai_requests set input_tokens = 0`);
+    assert.equal(upd.affectedRows ?? 0, 0, "log must be append-only");
+  });
+  await as(B, async () => {
+    assert.equal((await one(`select count(*)::int n from public.ai_requests`)).n, 0);
+    await assert.rejects(
+      db.query(`insert into public.ai_requests (inspection_id, kind) values ($1, 'analyze')`, [inspectionA]),
       /row-level security/,
     );
   });

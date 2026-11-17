@@ -11,6 +11,7 @@ import { uploadDefectPhotos } from "@/lib/photos";
 import { DEFECT_STATUSES, SEVERITIES, type DefectStatus, type Severity } from "@/lib/types";
 import type { DefectInput } from "@/lib/validation";
 import { createDefectAction, registerPhotosAction, updateDefectAction } from "../../../_actions/defects";
+import { AiAssistant } from "./ai-assistant";
 
 type Values = Omit<DefectInput, "inspectionId">;
 
@@ -24,6 +25,8 @@ export function DefectForm({
   initial,
   linkedItemTitle,
   returnToPlan = false,
+  aiEnabled = false,
+  storedPhotoCount = 0,
 }: {
   mode: "create" | "edit";
   inspectionId: string;
@@ -34,6 +37,8 @@ export function DefectForm({
   initial: Values;
   linkedItemTitle?: string;
   returnToPlan?: boolean;
+  aiEnabled?: boolean;
+  storedPhotoCount?: number;
 }) {
   const { t } = useI18n();
   const errorText = useErrorText();
@@ -113,6 +118,31 @@ export function DefectForm({
 
   const busy = phase !== "idle";
   const err = (k: string) => (errors[k] ? errorText(errors[k]) : undefined);
+
+  const assistant = aiEnabled ? (
+    <AiAssistant
+      inspectionId={inspectionId}
+      defectId={defectId}
+      newPhotos={photos}
+      storedPhotoCount={storedPhotoCount}
+      context={{
+        title: values.title,
+        description: values.description,
+        category: values.category,
+        severity: values.severity,
+        room: rooms.find((r) => r.id === values.roomId)?.label ?? "",
+        locationNote: values.locationNote,
+        recommendedAction: values.recommendedAction,
+      }}
+      onApply={(field, value) => {
+        if (field === "category") {
+          setCategoryChoice(categories.includes(value) ? value : NEW);
+          set("category", value);
+        } else if (field === "severity") set("severity", value as Severity);
+        else set(field, value);
+      }}
+    />
+  ) : null;
 
   return (
     <form onSubmit={submit} className="space-y-6 pb-4" noValidate>
@@ -248,6 +278,8 @@ export function DefectForm({
           <PhotoPicker files={photos} onChange={setPhotos} disabled={busy} />
         </section>
       )}
+
+      {assistant}
 
       <section className="card space-y-4 p-5 sm:p-6">
         <Field label={t.defect.action} htmlFor="action" optional={t.app.optional} error={err("recommendedAction")}>
