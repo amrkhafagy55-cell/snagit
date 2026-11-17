@@ -20,6 +20,11 @@ Short records of decisions that shape the codebase. Add a new entry rather than 
 **Decision:** Templates and checklist items store both `title_en` and `title_ar`. UI strings live in `src/lib/i18n/{en,ar}.ts`; `ar` is typed against `en`, so a missing key fails the build. The language lives in a cookie and is mirrored to `profiles.locale`.
 **Consequence:** Reports (Stage 4) can render in either language whatever language the inspection was done in. Custom items store the user's text in both fields.
 
+## D-007 — PDF reports via headless Chromium (2026-11-18)
+**Decision:** The report is HTML/CSS rendered to PDF by Chromium (`puppeteer-core`) on the server. Locally it uses the installed Chrome/Edge; on Vercel/Lambda it uses `@sparticuz/chromium`. Fonts (Inter, IBM Plex Sans Arabic) and images are embedded as data URIs, and request interception blocks every non-`data:` request.
+**Why:** It's the only option tested that shapes Arabic and lays out RTL correctly, and it gives vector text, CSS print layout and page numbers. pdfkit, pdfmake and react-pdf don't shape Arabic or handle bidi reliably.
+**Consequences:** Generation takes ~10–20 s and needs ~1 GB of function memory on serverless. Chrome stores Arabic as shaped glyphs, so **copying or searching Arabic text inside the PDF is unreliable** (it looks and prints correctly). The footer template can't use the embedded fonts, so it is Latin-only. Free-plan watermark/limits come in Stage 6.
+
 ## D-006 — Floor-plan pins are relative coordinates on a raster image (2026-11-18)
 **Decision:** A marker is stored as `plan_x`/`plan_y` in 0..1 of the plan image. PDFs are rendered to PNG (page 1, 2400 px long edge) in the browser with pdf.js when uploaded, and the viewer only ever shows that image. Zoom and pan are a small custom component (pointer events, no library), so a tap can be told apart from a drag and markers can be counter-scaled.
 **Why:** It works the same for PDF and image plans, needs no server-side PDF tooling, and Stage 4 can draw the same image with numbered markers into the report.

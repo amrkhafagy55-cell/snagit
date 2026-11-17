@@ -48,6 +48,7 @@ before(async () => {
   await db.exec(readFileSync(new URL("../migrations/0001_init.sql", import.meta.url), "utf8"));
   await db.exec(readFileSync(new URL("../migrations/0002_checklist_templates.sql", import.meta.url), "utf8"));
   await db.exec(readFileSync(new URL("../migrations/0003_floor_plan_mapping.sql", import.meta.url), "utf8"));
+  await db.exec(readFileSync(new URL("../migrations/0004_reports.sql", import.meta.url), "utf8"));
   await db.query(`insert into auth.users (id, email, raw_user_meta_data) values ($1, 'a@test.dev', $2), ($3, 'b@test.dev', $4)`, [
     A, JSON.stringify({ full_name: "Amina Inspector", account_type: "inspector", locale: "ar" }),
     B, JSON.stringify({ full_name: "Bob", account_type: "admin" }),
@@ -134,6 +135,30 @@ test("floor plan pins: owner can pin, coordinates come in pairs, others cannot m
   await as(B, async () => {
     const r = await db.query(`update public.defects set plan_x = 0.1, plan_y = 0.1`);
     assert.equal(r.affectedRows ?? 0, 0);
+  });
+});
+
+test("report versions: owner adds and reads them, cannot edit, others see nothing", async () => {
+  await as(A, async () => {
+    const path = `${A}/${inspectionA}/report-v1-en.pdf`;
+    await db.query(`insert into public.reports (inspection_id, version, language, storage_path, summary, byte_size, page_count)
+                    values ($1, 1, 'en', $2, '{"defects_total":3}', 1024, 5)`, [inspectionA, path]);
+    await assert.rejects(
+      db.query(`insert into public.reports (inspection_id, version, language, storage_path) values ($1, 2, 'en', $2)`, [inspectionA, `${B}/x.pdf`]),
+      /row-level security/,
+    );
+    const upd = await db.query(`update public.reports set version = 9`);
+    assert.equal(upd.affectedRows ?? 0, 0, "reports must be immutable");
+    await db.query(`insert into storage.objects (bucket_id, name) values ('reports', $1)`, [path]);
+    const r = await one(`select count(*)::int n, max((summary->>'defects_total')::int) t from public.reports`);
+    assert.deepEqual(r, { n: 1, t: 3 });
+  });
+  await as(B, async () => {
+    assert.equal((await one(`select count(*)::int n from public.reports`)).n, 0);
+    await assert.rejects(
+      db.query(`insert into storage.objects (bucket_id, name) values ('reports', $1)`, [`${A}/steal.pdf`]),
+      /row-level security/,
+    );
   });
 });
 

@@ -11,6 +11,7 @@ export function InspectionTabs({ id, defectCount }: { id: string; defectCount: n
     { href: base, label: t.workspace.overview, active: path === base || path.startsWith(`${base}/rooms`) },
     { href: `${base}/plan`, label: t.plan.tab, active: path.startsWith(`${base}/plan`) },
     { href: `${base}/defects`, label: t.workspace.defects, active: path.startsWith(`${base}/defects`), count: defectCount },
+    { href: `${base}/report`, label: t.report.tab, active: path.startsWith(`${base}/report`) },
   ];
   return (
     <nav className="mt-5 flex gap-1 border-b border-navy-100" aria-label={t.workspace.overview}>

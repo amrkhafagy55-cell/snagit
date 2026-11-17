@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0 — 2026-11-18 — Stage 4: PDF reports
+- New **Report** tab: generate an A4 PDF in English or Arabic (RTL) on the server with headless Chromium.
+- Contents: cover, executive summary with overall assessment, floor plan with numbered pins, defect register with before/after photos side by side, room-by-room checklist, final remarks, outstanding defects, signatures, disclaimer, page numbers.
+- Each report is a new immutable version in a private `reports` bucket with a frozen summary; earlier versions remain downloadable.
+- Fonts and images are embedded; rendering blocks all network access from the report page.
+- Migration `0004_reports.sql` and a DB test for report versions (10 tests).
+
 ## 0.3.0 — 2026-11-18 — Stage 3: interactive floor plan
 - New **Floor plan** tab: zoom (wheel / pinch / buttons), pan, tap to add a defect at a spot or pin an existing one.
 - Severity-coloured numbered markers that keep their size when zoomed. Marker card with Open / Move / Remove pin. Resolved defects are faded and can be hidden.
