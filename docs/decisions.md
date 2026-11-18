@@ -62,7 +62,8 @@ Short records of decisions that shape the codebase. Add a new entry rather than 
 
 ## D-010 — Hosting: Vercel, functions in Dublin, deployed with the CLI (2026-11-18)
 **Decision:** Production runs on Vercel (project `snagit`, Hobby plan for now). `vercel.json` pins functions to `dub1` because the Supabase project is in `eu-west-1`; every page makes several sequential Supabase calls, so a transatlantic default region (`iad1`) would add latency to each one. Deploys go through `vercel deploy --prod` from this folder until a Git remote exists. `siteUrl()` falls back to `VERCEL_PROJECT_PRODUCTION_URL`, so `NEXT_PUBLIC_SITE_URL` isn't needed on Vercel and a custom domain is picked up without a rebuild.
-**Consequences:** No automatic deploys or preview URLs per branch until the repo is pushed to GitHub and connected. The Hobby plan doesn't allow commercial use, so moving to Pro is a launch prerequisite. Changing the Supabase region means changing `vercel.json`.
+**Update (2026-11-18):** the code is on GitHub (`amrkhafagy55-cell/snagit`, private), and the Vercel project is connected to it. Pushes to `main` deploy production, and other branches get preview URLs. The CLI deploy still works for emergencies.
+**Consequences:** Anything merged to `main` goes live, so run `npm test` (and `npm run test:e2e` for risky changes) before pushing. The Hobby plan doesn't allow commercial use, so moving to Pro is a launch prerequisite. Changing the Supabase region means changing `vercel.json`.
 
 ## D-009 — Billing: Paymob, entitlements enforced in the database (2026-11-18)
 **Decision (product owner):** Paymob for Egypt. Pro annual EGP 2,499. Single report EGP 399, which unlocks the whole inspection. Free = 1 active inspection + 10 defects + watermarked report; floor-plan pinning and after photos are Pro-only.

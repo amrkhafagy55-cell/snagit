@@ -117,7 +117,9 @@ From this folder (on Windows PowerShell use `npx.cmd`):
    `npx vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY --environment production,preview`
    `NEXT_PUBLIC_SITE_URL` is optional on Vercel: without it, auth e-mails and payment redirects use the project's production domain (`VERCEL_PROJECT_PRODUCTION_URL`), which follows a custom domain once you add one.
    Server-only keys (`SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `PAYMOB_*`) go in the same way with `--sensitive`, never with a `NEXT_PUBLIC_` prefix.
-3. `npx vercel deploy --prod`.
+3. Deploy:
+   - **Normally:** the project is connected to GitHub ([amrkhafagy55-cell/snagit](https://github.com/amrkhafagy55-cell/snagit), private). Every push to `main` deploys to production, and every other branch gets a preview URL behind Vercel login.
+   - **By hand, without Git:** run `npx vercel deploy --prod`.
 4. In Supabase → Authentication → URL Configuration, set the Site URL to the production URL and add `https://<your-domain>/auth/callback` to Redirect URLs. Keep `http://localhost:3000/auth/callback` there for local development.
 5. Paymob (when enabled): set the transaction callback to `https://<your-domain>/api/payments/paymob/webhook`.
 
