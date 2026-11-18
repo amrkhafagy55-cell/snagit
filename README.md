@@ -4,6 +4,8 @@ SNAGIT helps apartment buyers, owners, inspectors and civil engineers inspect ne
 
 **Status:** Stages 1–6 of 7 are built (see [Roadmap](#roadmap)). Two parts can't run end to end until you add external credentials: the AI assistant (Stage 5, needs an Anthropic API key) and Paymob checkout (Stage 6, needs Paymob keys and the Supabase service-role key). The admin panel (Stage 7) is not built yet.
 
+**Live:** https://snagit-delta.vercel.app (Vercel, see [Deployment](#deployment-vercel)).
+
 ## Stack
 
 | Layer | Choice |
@@ -85,12 +87,24 @@ update public.profiles set role = 'admin' where id = (select id from auth.users 
 | `npm run test:db` | Runs both migrations on in-process Postgres and checks the triggers, numbering, summary view, RLS isolation and storage rules |
 
 ## Deployment (Vercel)
-1. Push the repo to GitHub and import it in Vercel. The framework preset is Next.js.
-2. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `NEXT_PUBLIC_SITE_URL` (the production URL).
-3. In Supabase, add `https://<your-domain>/auth/callback` to Redirect URLs and set the Site URL.
-4. Deploy. No other server is needed: everything else is Supabase.
+`vercel.json` pins functions to `dub1` (Dublin), next to the Supabase project in `eu-west-1`. If your Supabase project is in another region, change it to the closest [Vercel region](https://vercel.com/docs/regions). `.vercelignore` keeps `.env*` files out of CLI uploads.
 
-Any Node 20+ host that runs `next start` works too.
+From this folder (on Windows PowerShell use `npx.cmd`):
+1. `npx vercel login`, then `npx vercel link --project snagit`.
+2. Add the two public values (Production and Preview):
+   `npx vercel env add NEXT_PUBLIC_SUPABASE_URL --environment production,preview`
+   `npx vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY --environment production,preview`
+   `NEXT_PUBLIC_SITE_URL` is optional on Vercel: without it, auth e-mails and payment redirects use the project's production domain (`VERCEL_PROJECT_PRODUCTION_URL`), which follows a custom domain once you add one.
+   Server-only keys (`SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `PAYMOB_*`) go in the same way with `--sensitive`, never with a `NEXT_PUBLIC_` prefix.
+3. `npx vercel deploy --prod`.
+4. In Supabase → Authentication → URL Configuration, set the Site URL to the production URL and add `https://<your-domain>/auth/callback` to Redirect URLs. Keep `http://localhost:3000/auth/callback` there for local development.
+5. Paymob (when enabled): set the transaction callback to `https://<your-domain>/api/payments/paymob/webhook`.
+
+PDF reports run `@sparticuz/chromium` in the function (about 1 GB of memory, 60 s max on the report page). No other server is needed: everything else is Supabase.
+
+**Plan note:** Vercel's Hobby plan is for non-commercial use. Move to Pro (or another host) before taking real payments.
+
+Any Node 20+ host that runs `next start` works too (it needs a Chrome/Chromium for reports, or `CHROME_EXECUTABLE_PATH`).
 
 ## Database schema
 

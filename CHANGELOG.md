@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1 — 2026-11-18 — First production deployment
+- Live on Vercel: https://snagit-delta.vercel.app (Hobby plan, functions in `dub1` next to Supabase `eu-west-1`).
+- `vercel.json` (region), `.vercelignore` (no `.env*` uploads), `siteUrl()` falls back to the Vercel production domain.
+- Checked on production: sign-in, dashboard, inspection pages, billing, and EN + AR PDF reports rendered by `@sparticuz/chromium` (pages inspected as images).
+- README deployment steps rewritten for the CLI flow. Decision D-010.
+
 ## 0.6.0 — 2026-11-18 — Stage 6: plans, limits and Paymob payments
 - Plans: Free (1 active inspection, 10 defects, PREVIEW report, view-only plan, no after photos), Pro annual EGP 2,499, single report EGP 399 that unlocks one inspection. Prices and limits live in the `plans` table.
 - Limits enforced by database triggers (`SNAGIT_LIMIT:*`), surfaced as upgrade prompts with a link to Billing. Writes into other users' rows still fail on RLS first, so no information leaks.

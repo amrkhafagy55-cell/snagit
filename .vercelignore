@@ -1,0 +1,8 @@
+# Never upload local secrets with `vercel deploy`. Production values live in Vercel → Settings → Environment Variables.
+.env*
+!.env.example
+
+node_modules
+.next
+tsconfig.tsbuildinfo
+*.log
