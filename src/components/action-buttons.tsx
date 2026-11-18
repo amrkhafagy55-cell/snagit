@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
 import { useErrorText } from "@/lib/i18n/client";
 import type { ActionResult } from "@/lib/types";
+import { UpgradeLink } from "@/components/billing/upgrade-link";
 
 type Variant = "primary" | "accent" | "secondary" | "ghost" | "danger";
 
@@ -52,7 +53,11 @@ export function ActionButton({
       >
         {pending && pendingLabel ? pendingLabel : children}
       </Button>
-      {error && <span className="text-sm text-red-600">{errorText(error)}</span>}
+      {error && (
+        <span className="text-sm text-red-600">
+          {errorText(error)} <UpgradeLink code={error} className="ms-1" />
+        </span>
+      )}
     </span>
   );
 }

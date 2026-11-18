@@ -30,7 +30,7 @@ function slug(s: string) {
 export async function generateReportAction(
   inspectionId: string,
   lang: Lang,
-): Promise<ActionResult<{ url: string; version: number; pageCount: number }>> {
+): Promise<ActionResult<{ url: string; version: number; pageCount: number; preview: boolean }>> {
   const parsed = input.safeParse({ inspectionId, lang });
   if (!parsed.success) return { ok: false, error: "invalid" };
   try {
@@ -46,10 +46,13 @@ export async function generateReportAction(
       .maybeSingle();
     const version = (last?.version ?? 0) + 1;
     const generatedAt = new Date();
+    // Free plan → watermarked preview; Pro or an unlocked inspection → professional report.
+    const { data: unlocked } = await supabase.rpc("inspection_unlocked", { p_inspection: inspectionId });
+    const preview = unlocked !== true;
 
-    const html = buildReportHtml(data, { version, generatedAt, lang }, await fontFaceCss());
+    const html = buildReportHtml(data, { version, generatedAt, lang, preview }, await fontFaceCss());
     // Footer stays Latin-only: header/footer templates can't use the embedded fonts (no Arabic glyphs on servers).
-    const { pdf, pageCount } = await renderPdf(html, `SNAGIT · v${version} · ${todayIso()}`);
+    const { pdf, pageCount } = await renderPdf(html, `${preview ? "PREVIEW · " : ""}SNAGIT · v${version} · ${todayIso()}`);
 
     const fileName = `SNAGIT-${slug(data.property.project_name)}-v${version}-${lang}.pdf`;
     const path = `${user.id}/${inspectionId}/${generatedAt.getTime()}-${fileName}`;
@@ -73,6 +76,7 @@ export async function generateReportAction(
         items_passed: data.summary.items_passed,
         items_failed: data.summary.items_failed,
         status: data.inspection.status,
+        preview,
       },
     });
     if (rowErr) {
@@ -82,7 +86,7 @@ export async function generateReportAction(
 
     const { data: signed } = await supabase.storage.from("reports").createSignedUrl(path, 3600, { download: fileName });
     revalidatePath(`/inspections/${inspectionId}/report`);
-    return { ok: true, data: { url: signed?.signedUrl ?? "", version, pageCount } };
+    return { ok: true, data: { url: signed?.signedUrl ?? "", version, pageCount, preview } };
   } catch (e) {
     if (e instanceof ReportNotFound) return fail(new ActionError("notFound"));
     if (e instanceof PdfEngineUnavailable) return fail(new ActionError("pdfEngine"));

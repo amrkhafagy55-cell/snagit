@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0 — 2026-11-18 — Stage 6: plans, limits and Paymob payments
+- Plans: Free (1 active inspection, 10 defects, PREVIEW report, view-only plan, no after photos), Pro annual EGP 2,499, single report EGP 399 that unlocks one inspection. Prices and limits live in the `plans` table.
+- Limits enforced by database triggers (`SNAGIT_LIMIT:*`), surfaced as upgrade prompts with a link to Billing. Writes into other users' rows still fail on RLS first, so no information leaks.
+- Paymob checkout (Intention API + Unified Checkout). The webhook verifies HMAC-SHA512 over the 20 documented fields, checks amount and currency, and is idempotent. It's the only place a payment becomes paid. No buy buttons without credentials.
+- Free-plan reports carry a PREVIEW watermark on every page.
+- Billing page, payment return page, landing pricing, dashboard plan chip, Settings plan card.
+- Migration `0006_billing.sql`. Tests: 4 HMAC unit tests + 12 DB tests (incl. Free limits, unlock, Pro, expiry).
+- Sample loader no longer leaves an orphan property when the plan limit refuses the inspection.
+
 ## 0.5.0 — 2026-11-18 — Stage 5: AI defect assistant (optional)
 - "Analyze photos" and "Improve wording" in the new/edit defect form, using Claude Opus 5.5 vision with structured outputs and server-side refusal fallbacks.
 - Suggestions are labelled preliminary, applied field by field with "Use", and only saved when the user saves the defect. Potentially serious visible issues are flagged with a specialist recommendation.

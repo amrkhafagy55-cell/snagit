@@ -32,7 +32,7 @@ export function esc(value: unknown): string {
 /** User-entered text: escaped, line breaks kept, direction detected per paragraph. */
 const u = (v: unknown) => `<span class="u">${esc(v).replace(/\r?\n/g, "<br>")}</span>`;
 
-export type ReportMeta = { version: number; generatedAt: Date; lang: Lang };
+export type ReportMeta = { version: number; generatedAt: Date; lang: Lang; preview: boolean };
 
 export function buildReportHtml(data: ReportData, meta: ReportMeta, fontCss: string): string {
   const { lang } = meta;
@@ -79,9 +79,14 @@ export function buildReportHtml(data: ReportData, meta: ReportMeta, fontCss: str
       .map(([k, v]) => `<tr><th>${esc(k)}</th><td>${u(v)}</td></tr>`)
       .join("");
 
+  const previewText = lang === "ar" ? "نسخة تجريبية — غير صالحة للاستلام" : "PREVIEW — not valid for handover";
+  // position:fixed repeats on every printed page in Chromium.
+  const watermark = meta.preview ? `<div class="watermark" aria-hidden="true">${esc(lang === "ar" ? "نسخة تجريبية" : "PREVIEW")}</div>` : "";
+
   // ---------------------------------------------------------------- Cover
   const cover = `
   <section class="cover">
+    ${meta.preview ? `<div class="preview-banner">${esc(previewText)}</div>` : ""}
     <div class="cover-band">
       ${logoSvg()}
       <div class="cover-kicker">${esc(r.docSubtitle)}</div>
@@ -366,6 +371,7 @@ ${css(lang)}
 </style>
 </head>
 <body>
+${watermark}
 ${cover}
 ${summarySection}
 ${planSection}
@@ -474,6 +480,8 @@ h4 { margin: 0; font-size: 10.5pt; flex: 1; }
 .sig-row { display: flex; align-items: flex-end; gap: 3mm; margin-top: 5mm; }
 .sig-row span { font-size: 8pt; color: #3f65a8; width: 18mm; flex: none; }
 .sig-row b { flex: 1; border-bottom: 0.3mm solid #93afd9; min-height: 5mm; font-weight: 600; }
+.watermark { position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 64pt; font-weight: 700; color: rgba(220, 38, 38, 0.13); white-space: nowrap; z-index: 1000; pointer-events: none; letter-spacing: 2mm; }
+.preview-banner { background: #fef2f2; color: #b91c1c; border: 0.4mm solid #fecaca; border-radius: 2mm; padding: 2mm 4mm; font-weight: 700; font-size: 9pt; margin-bottom: 4mm; text-align: center; }
 .disclaimer { margin-top: 10mm; font-size: 7.6pt; color: #6286c2; border-top: 0.2mm solid #dfe8f5; padding-top: 3mm; }
 `;
 }

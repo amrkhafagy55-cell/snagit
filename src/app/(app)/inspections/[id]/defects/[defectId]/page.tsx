@@ -11,6 +11,7 @@ import { categoryLabel, formatDate, roomLabel } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n/server";
 import { deleteDefectAction } from "../../../../_actions/defects";
 import { PhotoGallery, PhotoUploader, ReinspectionForm } from "./client";
+import { isInspectionUnlocked } from "@/lib/billing";
 
 export const metadata: Metadata = { title: "Defect" };
 
@@ -24,6 +25,7 @@ export default async function DefectPage({ params, searchParams }: PageProps<"/i
     getI18n(),
   ]);
   const room = rooms.find((r) => r.id === defect.room_id);
+  const unlocked = await isInspectionUnlocked(id);
   const planUrl = property.floor_plan_width && property.floor_plan_height ? await getPlanImageUrl(property) : null;
   const pinned = defect.plan_x !== null && defect.plan_y !== null;
   const before = photos.filter((p) => p.kind === "before");
@@ -144,7 +146,14 @@ export default async function DefectPage({ params, searchParams }: PageProps<"/i
             {t.defect.afterPhotos} <span className="text-navy-400">({after.length})</span>
           </h3>
           <PhotoGallery photos={after} emptyText={t.defect.noPhotos} />
-          <PhotoUploader userId={user.id} inspectionId={id} defectId={defectId} kind="after" label={t.defect.addPhotos} />
+          {unlocked ? (
+            <PhotoUploader userId={user.id} inspectionId={id} defectId={defectId} kind="after" label={t.defect.addPhotos} />
+          ) : (
+            <p className="mt-4 border-t border-navy-50 pt-4 text-sm text-navy-500">
+              {t.billing.lockedAfter}{" "}
+              <Link href="/billing" className="font-semibold text-accent-600 hover:underline">{t.billing.seePlans}</Link>
+            </p>
+          )}
         </section>
       </div>
 

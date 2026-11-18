@@ -5,6 +5,11 @@ import { assertUuid } from "@/lib/data";
 import { formatNumber } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n/server";
 import { ReportGenerator } from "./report-generator";
+import { CheckoutButton } from "@/components/billing/checkout-button";
+import { getProfile } from "@/lib/auth";
+import { formatPrice, getPlans, isInspectionUnlocked } from "@/lib/billing";
+import { isPaymentsEnabled, isPaymobTestMode } from "@/lib/payments/paymob";
+import Link from "next/link";
 
 export const metadata: Metadata = { title: "Report" };
 // Rendering a PDF with headless Chromium can take a while on serverless hosts.
@@ -18,13 +23,21 @@ type ReportRow = {
   created_at: string;
   byte_size: number | null;
   page_count: number | null;
-  summary: { defects_total?: number; defects_open?: number; open_critical?: number };
+  summary: { defects_total?: number; defects_open?: number; open_critical?: number; preview?: boolean };
 };
 
 export default async function ReportPage({ params }: PageProps<"/inspections/[id]/report">) {
   const { id } = await params;
   assertUuid(id);
-  const [{ t, lang }, supabase] = await Promise.all([getI18n(), createClient()]);
+  const [{ t, lang }, supabase, unlocked, plans, profile] = await Promise.all([
+    getI18n(),
+    createClient(),
+    isInspectionUnlocked(id),
+    getPlans(),
+    getProfile(),
+  ]);
+  const reportPlan = plans.find((p) => p.id === "report");
+  const paymentsOn = isPaymentsEnabled();
   const { data } = await supabase
     .from("reports")
     .select("id, version, language, storage_path, created_at, byte_size, page_count, summary")
@@ -49,6 +62,40 @@ export default async function ReportPage({ params }: PageProps<"/inspections/[id
 
   return (
     <div className="grid gap-6 lg:grid-cols-5">
+      {!unlocked && (
+        <section className="rounded-2xl border border-accent-200 bg-accent-50/60 p-5 lg:col-span-5">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="max-w-2xl">
+              <h2 className="font-bold text-navy-900">{t.billing.unlockTitle}</h2>
+              <p className="mt-1 text-sm text-navy-600">{t.billing.unlockBody}</p>
+              <Link href="/billing" className="mt-2 inline-block text-sm font-semibold text-accent-700 hover:underline">
+                {t.billing.orPro} →
+              </Link>
+            </div>
+            {reportPlan && (
+              <div className="w-full shrink-0 md:w-72">
+                <p className="mb-2 text-center text-2xl font-extrabold text-navy-950">
+                  {formatPrice(reportPlan.price_cents, reportPlan.currency, lang)}
+                </p>
+                {paymentsOn ? (
+                  <CheckoutButton
+                    kind="report"
+                    inspectionId={id}
+                    defaultPhone={profile?.phone ?? ""}
+                    label={t.billing.unlockCta}
+                    testMode={isPaymobTestMode()}
+                  />
+                ) : (
+                  <p className="text-center text-xs text-navy-500">{t.billing.notEnabled}</p>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+      {unlocked && (
+        <p className="flex items-center gap-2 text-sm font-semibold text-emerald-700 lg:col-span-5">✓ {t.billing.unlocked}</p>
+      )}
       <section className="card p-5 sm:p-6 lg:col-span-2">
         <h2 className="text-lg font-bold text-navy-900">{t.report.generateTitle}</h2>
         <p className="mt-1 text-sm text-navy-500">{t.report.generateBody}</p>
@@ -73,6 +120,7 @@ export default async function ReportPage({ params }: PageProps<"/inspections/[id
                       {rep.language === "ar" ? "العربية" : "English"}
                     </span>
                     {i === 0 && <span className="ms-2 rounded bg-accent-50 px-1.5 py-0.5 text-xs font-semibold text-accent-700">{t.report.latest}</span>}
+                    {rep.summary?.preview && <span className="ms-2 rounded bg-red-50 px-1.5 py-0.5 text-xs font-semibold text-red-700">PREVIEW</span>}
                   </p>
                   <p className="text-sm text-navy-500">
                     {when(rep.created_at)}

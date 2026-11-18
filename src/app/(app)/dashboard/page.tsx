@@ -9,11 +9,12 @@ import { completion, getInspectionSummaries } from "@/lib/data";
 import { formatDate, formatNumber } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n/server";
 import { loadSampleProjectAction } from "../_actions/sample";
+import { getEntitlements } from "@/lib/billing";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
 export default async function DashboardPage() {
-  const [{ t, lang }, profile, summaries] = await Promise.all([getI18n(), getProfile(), getInspectionSummaries()]);
+  const [{ t, lang }, profile, summaries, ent] = await Promise.all([getI18n(), getProfile(), getInspectionSummaries(), getEntitlements()]);
 
   const active = summaries.filter((s) => s.status === "in_progress" || s.status === "draft").length;
   const completed = summaries.filter((s) => s.status === "completed").length;
@@ -36,10 +37,15 @@ export default async function DashboardPage() {
         title={firstName ? `${t.dashboard.greeting} ${firstName}` : t.dashboard.title}
         subtitle={t.dashboard.subtitle}
         actions={
+          <>
+          <LinkButton href="/billing" variant="secondary" size="lg">
+            {ent.pro ? "Pro" : `${t.billing.free} · ${t.billing.upgrade}`}
+          </LinkButton>
           <LinkButton href="/properties/new" variant="accent" size="lg">
             <Plus className="size-5" aria-hidden />
             {t.dashboard.startNew}
           </LinkButton>
+          </>
         }
       />
 

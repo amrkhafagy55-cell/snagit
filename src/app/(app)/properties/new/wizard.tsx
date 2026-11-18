@@ -9,6 +9,7 @@ import { discardFloorPlan, uploadFloorPlan, type FloorPlanUpload } from "@/lib/f
 import { FLOOR_PLAN_MAX_BYTES, FLOOR_PLAN_TYPES, type CreatePropertyInput } from "@/lib/validation";
 import { PROPERTY_TYPES, type PropertyType } from "@/lib/types";
 import { createPropertyAction } from "../../_actions/inspections";
+import { UpgradeLink } from "@/components/billing/upgrade-link";
 
 type Values = Omit<CreatePropertyInput, "propertyId" | "floorPlan">;
 
@@ -182,7 +183,11 @@ export function PropertyWizard({
         }}
         noValidate
       >
-        {formError && <Alert>{errorText(formError)}</Alert>}
+        {formError && (
+          <Alert>
+            {errorText(formError)} <UpgradeLink code={formError} className="ms-2" />
+          </Alert>
+        )}
 
         {step === 0 && (
           <>

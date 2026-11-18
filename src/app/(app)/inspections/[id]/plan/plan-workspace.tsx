@@ -10,6 +10,7 @@ import { MARKER_COLORS } from "@/components/plan/marker-colors";
 import { useErrorText, useI18n } from "@/lib/i18n/client";
 import { SEVERITIES, type DefectStatus, type Severity } from "@/lib/types";
 import { setDefectPinAction } from "../../../_actions/plan";
+import { UpgradeLink } from "@/components/billing/upgrade-link";
 
 export type PlanDefect = {
   id: string;
@@ -30,12 +31,14 @@ export function PlanWorkspace({
   initialDefects,
   initialPinId,
   initialFocusId,
+  locked = false,
 }: {
   inspectionId: string;
   plan: { url: string; width: number; height: number };
   initialDefects: PlanDefect[];
   initialPinId?: string;
   initialFocusId?: string;
+  locked?: boolean;
 }) {
   const { t } = useI18n();
   const errorText = useErrorText();
@@ -78,6 +81,7 @@ export function PlanWorkspace({
   }
 
   function onTapPlan(x: number, y: number) {
+    if (locked) return;
     if (placingId) {
       savePin(placingId, x, y);
       setSelectedId(placingId);
@@ -95,7 +99,17 @@ export function PlanWorkspace({
 
   return (
     <div className="space-y-4">
-      {error && <Alert>{errorText(error)}</Alert>}
+      {error && (
+        <Alert>
+          {errorText(error)} <UpgradeLink code={error} className="ms-2" />
+        </Alert>
+      )}
+      {locked && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-accent-200 bg-accent-50/70 px-4 py-3 text-sm text-navy-700">
+          <span>{t.billing.lockedPlan}</span>
+          <UpgradeLink code="limit_plan" />
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-navy-600">
@@ -122,7 +136,7 @@ export function PlanWorkspace({
           dimmedIds={dimmed}
           ghost={tapAt}
           focus={initialFocus}
-          crosshair={Boolean(placingId)}
+          crosshair={Boolean(placingId) && !locked}
           onTapPlan={onTapPlan}
           onTapMarker={(id) => {
             setTapAt(null);
@@ -214,11 +228,11 @@ export function PlanWorkspace({
                   <ExternalLink className="size-3.5" aria-hidden />
                   {t.plan.open}
                 </LinkButton>
-                <Button type="button" variant="secondary" size="sm" onClick={() => setPlacingId(selected.id)}>
+                {!locked && <Button type="button" variant="secondary" size="sm" onClick={() => setPlacingId(selected.id)}>
                   <Move className="size-3.5" aria-hidden />
                   {t.plan.move}
-                </Button>
-                <Button
+                </Button>}
+                {!locked && <Button
                   type="button"
                   variant="danger"
                   size="sm"
@@ -231,12 +245,12 @@ export function PlanWorkspace({
                 >
                   <Trash2 className="size-3.5" aria-hidden />
                   <span className="sr-only sm:not-sr-only">{t.plan.removePinShort}</span>
-                </Button>
+                </Button>}
               </div>
             </div>
           )}
         </PlanViewer>
-        <p className="border-t border-navy-50 px-4 py-2.5 text-xs text-navy-500">{t.plan.hint}</p>
+        {!locked && <p className="border-t border-navy-50 px-4 py-2.5 text-xs text-navy-500">{t.plan.hint}</p>}
       </div>
 
       <section>
@@ -257,7 +271,7 @@ export function PlanWorkspace({
                   <p className="truncate text-sm font-medium text-navy-900 hover:underline">{d.title}</p>
                   {d.roomLabel && <p className="truncate text-xs text-navy-500">{d.roomLabel}</p>}
                 </Link>
-                <Button
+                {!locked && <Button
                   type="button"
                   variant={placingId === d.id ? "accent" : "secondary"}
                   size="sm"
@@ -270,7 +284,7 @@ export function PlanWorkspace({
                 >
                   <MapPin className="size-3.5" aria-hidden />
                   {t.plan.pin}
-                </Button>
+                </Button>}
               </li>
             ))}
           </ul>

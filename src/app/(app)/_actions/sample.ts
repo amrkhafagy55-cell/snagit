@@ -175,7 +175,10 @@ export async function loadSampleProjectAction(): Promise<ActionResult> {
       })
       .select("id")
       .single();
-    if (iErr) throw iErr;
+    if (iErr) {
+      await supabase.from("properties").delete().eq("id", property.id);
+      throw iErr;
+    }
     inspectionId = insp.id;
 
     const { error: rErr } = await supabase.rpc("initialize_inspection", {

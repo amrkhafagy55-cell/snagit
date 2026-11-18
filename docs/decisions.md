@@ -20,6 +20,11 @@ Short records of decisions that shape the codebase. Add a new entry rather than 
 **Decision:** Templates and checklist items store both `title_en` and `title_ar`. UI strings live in `src/lib/i18n/{en,ar}.ts`; `ar` is typed against `en`, so a missing key fails the build. The language lives in a cookie and is mirrored to `profiles.locale`.
 **Consequence:** Reports (Stage 4) can render in either language whatever language the inspection was done in. Custom items store the user's text in both fields.
 
+## D-009 — Billing: Paymob, entitlements enforced in the database (2026-11-18)
+**Decision (product owner):** Paymob for Egypt. Pro annual EGP 2,499. Single report EGP 399, which unlocks the whole inspection. Free = 1 active inspection + 10 defects + watermarked report; floor-plan pinning and after photos are Pro-only.
+**Technical:** Limits are BEFORE-triggers that raise `SNAGIT_LIMIT:<code>`, so the anon key + user session can't bypass them. Entitlement helpers: `has_pro`, `inspection_unlocked` and `my_entitlements`. Payments, subscriptions and unlocks are written only with the service-role key. The webhook verifies HMAC-SHA512 over Paymob's 20 documented fields (constant-time compare), checks the amount and currency against our row, and is idempotent. Redirects never change state.
+**Consequences:** Webhooks need a public URL (a tunnel for local tests). Paymob's GET redirect HMAC isn't used. Refunds and cancellations are manual (SQL) until the admin panel. "Inspection history" stays available to Free users, because the Free limit counts only active inspections.
+
 ## D-008 — AI assistant: one structured call, human applies each field (2026-11-18)
 **Decision:** A single `client.beta.messages.parse` call to `claude-opus-5-5` (effort `medium`, adaptive thinking) returns a Zod-validated suggestion. `fallbacks: "default"` (beta `server-side-fallback-2026-07-01`) retries a safety-classifier decline on Anthropic's recommended model. The key lives only on the server, the feature is hidden without it, and every call is logged with a per-user daily cap that fails closed if the log table is missing.
 **Why:** The spec requires suggestions to be preliminary and human-confirmed. A per-field "Use" button plus a normal Save keeps the person in control. One call keeps latency (~10–20 s) and cost (~$0.03–0.05) predictable.

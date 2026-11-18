@@ -8,6 +8,7 @@ import { getI18n } from "@/lib/i18n/server";
 import type { Severity } from "@/lib/types";
 import { PlanWorkspace, type PlanDefect } from "./plan-workspace";
 import { RoomLayout, type LayoutRoom } from "./room-layout";
+import { isInspectionUnlocked } from "@/lib/billing";
 
 export const metadata: Metadata = { title: "Floor plan" };
 
@@ -20,6 +21,7 @@ export default async function PlanPage({ params, searchParams }: PageProps<"/ins
     getDefects(id),
     getI18n(),
   ]);
+  const unlocked = await isInspectionUnlocked(id);
 
   const hasPlan = Boolean(property.floor_plan_image_path && property.floor_plan_width && property.floor_plan_height);
   const [imageUrl, originalUrl] = await Promise.all([
@@ -71,6 +73,7 @@ export default async function PlanPage({ params, searchParams }: PageProps<"/ins
           initialDefects={planDefects}
           initialPinId={str(sp.pin)}
           initialFocusId={str(sp.focus)}
+          locked={!unlocked}
         />
       ) : (
         <>

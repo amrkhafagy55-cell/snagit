@@ -50,6 +50,7 @@ before(async () => {
   await db.exec(readFileSync(new URL("../migrations/0003_floor_plan_mapping.sql", import.meta.url), "utf8"));
   await db.exec(readFileSync(new URL("../migrations/0004_reports.sql", import.meta.url), "utf8"));
   await db.exec(readFileSync(new URL("../migrations/0005_ai_requests.sql", import.meta.url), "utf8"));
+  await db.exec(readFileSync(new URL("../migrations/0006_billing.sql", import.meta.url), "utf8"));
   await db.query(`insert into auth.users (id, email, raw_user_meta_data) values ($1, 'a@test.dev', $2), ($3, 'b@test.dev', $4)`, [
     A, JSON.stringify({ full_name: "Amina Inspector", account_type: "inspector", locale: "ar" }),
     B, JSON.stringify({ full_name: "Bob", account_type: "admin" }),
@@ -107,6 +108,67 @@ test("defects get sequential numbers and the summary view counts them", async ()
   });
 });
 
+test("Free plan: 10 defects, no pins, no after photos, one active inspection; unlock and Pro lift limits", async () => {
+  const limit = (code) => new RegExp("SNAGIT_LIMIT:" + code);
+  await as(A, async () => {
+    const ent = (await one(`select public.my_entitlements() e`)).e;
+    assert.equal(ent.pro, false);
+    assert.equal(ent.max_defects_per_inspection, 10);
+    assert.equal(ent.active_inspections, 1);
+    // 3 defects exist; 7 more reach the limit, the 11th is refused
+    for (let i = 0; i < 7; i++) {
+      await db.query(`insert into public.defects (inspection_id, title, category) values ($1, 'd', 'architectural')`, [inspectionA]);
+    }
+    await assert.rejects(db.query(`insert into public.defects (inspection_id, title, category) values ($1, 'x', 'architectural')`, [inspectionA]), limit("defects"));
+    const d = await one(`select id from public.defects where inspection_id = $1 order by number limit 1`, [inspectionA]);
+    await assert.rejects(db.query(`update public.defects set plan_x = 0.2, plan_y = 0.2 where id = $1`, [d.id]), limit("plan"));
+    await assert.rejects(
+      db.query(`insert into public.defect_photos (defect_id, storage_path, kind) values ($1, $2, 'after')`, [d.id, `${A}/${inspectionA}/${d.id}/a.jpg`]),
+      limit("after_photos"),
+    );
+    const p2 = await one(`insert into public.properties (project_name) values ('Second unit') returning id`);
+    await assert.rejects(db.query(`insert into public.inspections (property_id) values ($1)`, [p2.id]), limit("active_inspections"));
+    // completed inspections don't count as active
+    await db.query(`insert into public.inspections (property_id, status) values ($1, 'completed')`, [p2.id]);
+    assert.equal(await one(`select public.inspection_unlocked($1) u`, [inspectionA]).then((r) => r.u), false);
+    // users can't create payments or grant themselves entitlements
+    await assert.rejects(db.query(`insert into public.payments (user_id, kind, amount_cents, currency) values ($1, 'pro_annual', 1, 'EGP')`, [A]), /row-level security/);
+    await assert.rejects(db.query(`insert into public.inspection_unlocks (inspection_id, user_id) values ($1, $2)`, [inspectionA, A]), /row-level security/);
+    await assert.rejects(db.query(`insert into public.subscriptions (user_id, plan_id, current_period_start, current_period_end) values ($1, 'pro_annual', now(), now() + interval '1 year')`, [A]), /row-level security/);
+  });
+
+  // Server (service role) records a paid single report → that inspection is unlocked
+  await db.query(`insert into public.inspection_unlocks (inspection_id, user_id) values ($1, $2)`, [inspectionA, A]);
+  await as(A, async () => {
+    assert.equal((await one(`select public.inspection_unlocked($1) u`, [inspectionA])).u, true);
+    await db.query(`insert into public.defects (inspection_id, title, category) values ($1, 'eleventh', 'architectural')`, [inspectionA]);
+    const p3 = await one(`select id from public.properties where project_name = 'Second unit'`);
+    await assert.rejects(db.query(`insert into public.inspections (property_id) values ($1)`, [p3.id]), limit("active_inspections"));
+  });
+  await db.query(`delete from public.inspection_unlocks where inspection_id = $1`, [inspectionA]);
+
+  // Server records an annual subscription → Pro everywhere
+  await db.query(`insert into public.subscriptions (user_id, plan_id, current_period_start, current_period_end) values ($1, 'pro_annual', now(), now() + interval '1 year')`, [A]);
+  await as(A, async () => {
+    const ent = (await one(`select public.my_entitlements() e`)).e;
+    assert.equal(ent.pro, true);
+    const p3 = await one(`select id from public.properties where project_name = 'Second unit'`);
+    const extra = await one(`insert into public.inspections (property_id) values ($1) returning id`, [p3.id]);
+    await db.query(`delete from public.inspections where id = $1`, [extra.id]);
+    await db.query(`delete from public.properties where id = $1`, [p3.id]);
+  });
+  // Expired subscription → back to Free
+  await db.query(`update public.subscriptions set current_period_end = now() - interval '1 day' where user_id = $1`, [A]);
+  await as(A, async () => {
+    assert.equal((await one(`select public.my_entitlements() e`)).e.pro, false);
+    // Another user can't learn anything about A's inspection
+  });
+  await as(B, async () => {
+    assert.equal((await one(`select public.inspection_unlocked($1) u`, [inspectionA])).u, false);
+    assert.equal((await one(`select count(*)::int n from public.plans`)).n, 3);
+  });
+});
+
 test("another user sees nothing and cannot write into someone else's inspection", async () => {
   await as(B, async () => {
     for (const t of ["properties", "inspections", "rooms", "checklist_items", "defects", "inspection_summaries"]) {
@@ -124,6 +186,7 @@ test("another user sees nothing and cannot write into someone else's inspection"
 });
 
 test("floor plan pins: owner can pin, coordinates come in pairs, others cannot move them", async () => {
+  await db.query(`insert into public.inspection_unlocks (inspection_id, user_id) values ($1, $2) on conflict do nothing`, [inspectionA, A]);
   await as(A, async () => {
     await db.query(`update public.properties set floor_plan_image_path = 'x.png', floor_plan_width = 1400, floor_plan_height = 1000`);
     const d = await one(`select id from public.defects where inspection_id = $1 order by number limit 1`, [inspectionA]);

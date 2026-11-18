@@ -7,10 +7,14 @@ import { SeverityBadge, DefectStatusBadge } from "@/components/badges";
 import { getI18n } from "@/lib/i18n/server";
 import { getUser } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { formatPrice, getPlans } from "@/lib/billing";
+import { Check } from "lucide-react";
 
 export default async function LandingPage() {
   const { t, lang } = await getI18n();
   const user = isSupabaseConfigured() ? await getUser() : null;
+  const plans = isSupabaseConfigured() ? await getPlans().catch(() => []) : [];
+  const priced = (id: string) => plans.find((p) => p.id === id);
 
   const features = [
     { icon: ListChecks, title: t.landing.f1Title, body: t.landing.f1Body },
@@ -138,6 +142,43 @@ export default async function LandingPage() {
           </div>
         </section>
       </main>
+
+      {plans.length > 0 && (
+        <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6" id="pricing">
+          <h2 className="text-center text-3xl font-bold tracking-tight text-navy-950">{t.billing.pricingTitle}</h2>
+          <p className="mx-auto mt-2 max-w-2xl text-center text-navy-500">{t.billing.pricingSubtitle}</p>
+          <div className="mt-10 grid gap-5 md:grid-cols-3">
+            {[
+              { id: "free", title: t.billing.free, features: t.billing.freeFeatures, suffix: "", highlight: false },
+              { id: "pro_annual", title: "Pro", features: t.billing.proFeatures, suffix: t.billing.perYear, highlight: true },
+              { id: "report", title: lang === "ar" ? priced("report")?.name_ar : priced("report")?.name_en, features: t.billing.reportFeatures, suffix: t.billing.oneTime, highlight: false },
+            ].map((card) => {
+              const p = priced(card.id);
+              if (!p) return null;
+              return (
+                <div key={card.id} className={`card flex flex-col p-6 ${card.highlight ? "border-2 border-accent-400 shadow-lg shadow-accent-500/10" : ""}`}>
+                  <h3 className="text-lg font-bold text-navy-900">{card.title}</h3>
+                  <p className="mt-2 text-3xl font-extrabold text-navy-950">
+                    {formatPrice(p.price_cents, p.currency, lang)}
+                    {card.suffix && <span className="ms-1 text-base font-medium text-navy-500">{card.suffix}</span>}
+                  </p>
+                  <ul className="mt-5 flex-1 space-y-2 text-sm text-navy-700">
+                    {card.features.map((f) => (
+                      <li key={f} className="flex gap-2">
+                        <Check className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-hidden />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <LinkButton href={user ? "/billing" : "/register"} variant={card.highlight ? "accent" : "secondary"} className="mt-6 w-full">
+                    {user ? t.billing.seePlans : t.nav.getStarted}
+                  </LinkButton>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <footer className="border-t border-navy-100">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-navy-500 sm:flex-row sm:px-6">

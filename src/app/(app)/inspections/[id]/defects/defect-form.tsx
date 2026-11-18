@@ -12,6 +12,7 @@ import { DEFECT_STATUSES, SEVERITIES, type DefectStatus, type Severity } from "@
 import type { DefectInput } from "@/lib/validation";
 import { createDefectAction, registerPhotosAction, updateDefectAction } from "../../../_actions/defects";
 import { AiAssistant } from "./ai-assistant";
+import { UpgradeLink } from "@/components/billing/upgrade-link";
 
 type Values = Omit<DefectInput, "inspectionId">;
 
@@ -146,7 +147,11 @@ export function DefectForm({
 
   return (
     <form onSubmit={submit} className="space-y-6 pb-4" noValidate>
-      {formError && <Alert>{errorText(formError)}</Alert>}
+      {formError && (
+        <Alert>
+          {errorText(formError)} <UpgradeLink code={formError} className="ms-2" />
+        </Alert>
+      )}
 
       {values.planX != null && values.planY != null && (
         <div className="flex items-center gap-2 rounded-xl bg-accent-50 px-3 py-2 text-sm text-accent-700">

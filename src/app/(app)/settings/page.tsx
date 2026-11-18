@@ -4,11 +4,14 @@ import { getProfile, requireUser } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n/server";
 import { UpdatePasswordForm } from "../../(auth)/auth-forms";
 import { ProfileForm } from "./profile-form";
+import { LinkButton } from "@/components/ui";
+import { getEntitlements } from "@/lib/billing";
+import { formatDate } from "@/lib/i18n";
 
 export const metadata: Metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
-  const [user, profile, { t }] = await Promise.all([requireUser(), getProfile(), getI18n()]);
+  const [user, profile, { t, lang }, ent] = await Promise.all([requireUser(), getProfile(), getI18n(), getEntitlements()]);
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader title={t.settings.title} />
@@ -33,8 +36,14 @@ export default async function SettingsPage() {
       <section className="card flex items-center justify-between p-5 sm:p-6">
         <div>
           <h2 className="font-semibold text-navy-900">{t.settings.plan}</h2>
-          <p className="text-sm text-navy-500">{t.settings.freePlan}</p>
+          <p className="text-sm text-navy-500">
+            {ent.pro ? t.billing.pro : t.billing.free}
+            {ent.pro && ent.proUntil ? ` · ${t.billing.proUntil} ${formatDate(ent.proUntil, lang)}` : ""}
+          </p>
         </div>
+        <LinkButton href="/billing" variant={ent.pro ? "secondary" : "accent"} size="sm">
+          {ent.pro ? t.billing.nav : t.billing.upgrade}
+        </LinkButton>
       </section>
     </div>
   );
