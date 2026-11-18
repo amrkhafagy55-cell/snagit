@@ -7,11 +7,15 @@ import { ProfileForm } from "./profile-form";
 import { LinkButton } from "@/components/ui";
 import { getEntitlements } from "@/lib/billing";
 import { formatDate } from "@/lib/i18n";
+import Link from "next/link";
+import { isAdminClientConfigured } from "@/lib/supabase/admin";
+import { DeleteAccount } from "./delete-account";
 
 export const metadata: Metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
   const [user, profile, { t, lang }, ent] = await Promise.all([requireUser(), getProfile(), getI18n(), getEntitlements()]);
+  const isAdmin = profile?.role === "admin";
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader title={t.settings.title} />
@@ -44,6 +48,23 @@ export default async function SettingsPage() {
         <LinkButton href="/billing" variant={ent.pro ? "secondary" : "accent"} size="sm">
           {ent.pro ? t.billing.nav : t.billing.upgrade}
         </LinkButton>
+      </section>
+      <section className="card border-red-200 p-5 sm:p-6" aria-labelledby="delete-title">
+        <h2 id="delete-title" className="mb-3 text-lg font-semibold text-red-700">
+          {t.settings.deleteTitle}
+        </h2>
+        {isAdmin ? (
+          <p className="text-sm text-navy-600">{t.settings.deleteAdmin}</p>
+        ) : isAdminClientConfigured() ? (
+          <DeleteAccount email={user.email} pro={ent.pro} />
+        ) : (
+          <p className="text-sm text-navy-600">
+            {t.settings.deleteByRequest}{" "}
+            <Link href="/contact" className="font-semibold text-accent-700 underline">
+              {t.legal.contact}
+            </Link>
+          </p>
+        )}
       </section>
     </div>
   );

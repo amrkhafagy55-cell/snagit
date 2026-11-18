@@ -20,6 +20,18 @@ Short records of decisions that shape the codebase. Add a new entry rather than 
 **Decision:** Templates and checklist items store both `title_en` and `title_ar`. UI strings live in `src/lib/i18n/{en,ar}.ts`; `ar` is typed against `en`, so a missing key fails the build. The language lives in a cookie and is mirrored to `profiles.locale`.
 **Consequence:** Reports (Stage 4) can render in either language whatever language the inspection was done in. Custom items store the user's text in both fields.
 
+## D-015 — Self-service account deletion: files, then profile, then auth user (2026-11-18)
+**Decision:** Settings → Delete account (type your e-mail, then confirm). The server action:
+1. Removes the user's files in all three buckets with their own session: known paths plus a sweep of `<uid>/`.
+2. Deletes the `profiles` row as service_role, which cascades to everything they own.
+3. Calls `auth.admin.deleteUser`, then clears the session cookies.
+
+Payments survive with `user_id = null` and the stored Paymob callback wiped (migration 0008). Admins can't delete themselves. Without the service-role key, the page offers deletion on request instead.
+
+**Why:** Calling `deleteUser` directly fails with "Database error deleting user" once the user has data. This was reproduced on the live project with a throwaway account. Supabase Auth runs the cascade as `supabase_auth_admin`, which has no rights on our tables and triggers. Deleting the profile first as service_role works and keeps every row under our control. Keeping anonymised payments meets the accounting promise in the privacy policy.
+
+**Consequences:** Deleting an auth user from the Supabase dashboard can fail in the same way. Delete the profile row first, or use the SQL in the README. A partial failure after step 2 leaves an auth user without a profile; retrying the deletion completes it.
+
 ## D-014 — End-to-end tests with Playwright in the installed Chrome (2026-11-18)
 **Decision:** `npm run test:e2e` runs Playwright with `channel: "chrome"`, so no browser download is needed. Public pages run on desktop and a Pixel 7 viewport. The signed-in journey uses a dedicated Free, non-admin test account from `.env.local` (`E2E_EMAIL`, `E2E_PASSWORD`), cleans up after itself, and is skipped without credentials. `E2E_BASE_URL` points the suite at a deployed site.
 **Why:** It tests the real Supabase project and real PDF rendering without a second database. Product owner decision (2026-11-18).

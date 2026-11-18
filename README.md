@@ -42,6 +42,7 @@ SNAGIT helps apartment buyers, owners, inspectors and civil engineers inspect ne
   - **Settings:** an announcement banner (EN/AR) shown on every app page, the support email and WhatsApp number shown on the Contact page, and the AI daily limit.
   - **Activity:** an append-only audit log of every admin change, including field-by-field diffs of config edits.
 - **Report share links (Stage 7):** from the Report tab, share one report version through a link valid for 7, 30 or 90 days. Recipients get a branded page with a Download button, with no account needed. Owners see each active link's download count and can revoke it at any time. Tokens are 64 hex characters, links never leak through the Referer header, and downloads go through a 60-second signed URL. Needs `SUPABASE_SERVICE_ROLE_KEY` on the server; without it the Share button is hidden.
+- **Delete account (Settings):** type your e-mail and confirm. It removes every file (photos, plans, PDFs), all inspections and share links, the profile and the sign-in account, then signs you out. Payment records stay for accounting, without the user's name or contact details. Administrators can't delete themselves. Needs `SUPABASE_SERVICE_ROLE_KEY`; without it, the page points to the Contact page instead.
 - **Legal pages (Stage 7, drafts):** Privacy policy, Terms of use, Refund policy (EN/AR) and a Contact page, linked from the landing footer and the sign-up form. They're marked as drafts pending legal review.
 - **Security:**
   - RLS on every table means a user only ever reads or writes their own rows. A DB test fails if any table loses RLS or any security-definer function has no pinned `search_path`.
@@ -63,6 +64,7 @@ SNAGIT helps apartment buyers, owners, inspectors and civil engineers inspect ne
    - `supabase/migrations/0005_ai_requests.sql`: AI usage log for the daily limit (Stage 5; the assistant refuses to run without it).
    - `supabase/migrations/0006_billing.sql`: plans, payments, subscriptions, per-inspection unlocks and Free-plan limit triggers (Stage 6).
    - `supabase/migrations/0007_admin.sql`: admin functions and audit log, defect categories, app settings, report share links (Stage 7). Needs 0005 first.
+   - `supabase/migrations/0008_account_deletion.sql`: payments survive account deletion, anonymised.
 3. Under **Authentication → URL Configuration**:
    - Site URL: `http://localhost:3000` (your production URL later)
    - Redirect URLs: `http://localhost:3000/auth/callback` (plus the production equivalent)
@@ -173,6 +175,6 @@ defect_categories · app_settings · admin_audit (Stage 7, admin-managed)
 | 5 | AI defect assistant (suggestions are always labelled preliminary and need human confirmation) | Built; awaiting API key for live test |
 | 6 | Plans (Free / Pro annual / pay-per-report), payment integration in test mode, feature limits | Built; awaiting Paymob test keys for an end-to-end payment |
 | 7 | Admin dashboard, report share links, legal pages, security review and hardening, E2E tests, deployment | Done |
-| Later | Account deletion from Settings, invite collaborators to an inspection, custom domain, Supabase custom SMTP | Backlog |
+| Later | Offline / weak-network mode, invite collaborators to an inspection, custom domain, Supabase custom SMTP, error monitoring | Backlog |
 
 See `docs/decisions.md` for the main technical decisions and `CHANGELOG.md` for changes.

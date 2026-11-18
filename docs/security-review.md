@@ -47,7 +47,7 @@ Scope: the whole app at version 0.7.0 (Next.js server actions and routes, Supaba
 | CSP allows `'unsafe-inline'` scripts | Next.js inlines its bootstrap. Per-request nonces would need middleware changes and disable static optimisation. Revisit together with Cache Components (D-001). |
 | `has_pro(uuid)` is callable by any signed-in user | It reveals only whether some user id is Pro, and ids are random UUIDs that are never shown. Triggers depend on it, so revoking it needs care. Backlog. |
 | Supabase's built-in e-mail sender is rate-limited | Configure custom SMTP before launch (README, credentials table). |
-| No in-app account deletion | The privacy policy offers deletion on request. Add a self-service "Delete my account" to Settings (backlog). |
+| ~~No in-app account deletion~~ | **Done in 0.7.1:** Settings → Delete account. It removes files, data, the profile and the auth user, and keeps payments anonymised (D-015, E2E-tested). |
 | Vercel Hobby plan | Not allowed for commercial use. Move to Pro before taking real payments (D-010). |
 | Legal pages are drafts | They need a lawyer's review, the operator's legal name and address, and a decision on the refund windows. |
 | No WAF or rate limiting on sign-in beyond Supabase's | Supabase Auth applies its own limits. Consider Vercel Firewall rules after launch if abuse shows up. |

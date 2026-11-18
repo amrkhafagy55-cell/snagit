@@ -60,6 +60,7 @@ before(async () => {
   await db.exec(readFileSync(new URL("../migrations/0005_ai_requests.sql", import.meta.url), "utf8"));
   await db.exec(readFileSync(new URL("../migrations/0006_billing.sql", import.meta.url), "utf8"));
   await db.exec(readFileSync(new URL("../migrations/0007_admin.sql", import.meta.url), "utf8"));
+  await db.exec(readFileSync(new URL("../migrations/0008_account_deletion.sql", import.meta.url), "utf8"));
   await db.query(`insert into auth.users (id, email, raw_user_meta_data) values ($1, 'a@test.dev', $2), ($3, 'b@test.dev', $4)`, [
     A, JSON.stringify({ full_name: "Amina Inspector", account_type: "inspector", locale: "ar" }),
     B, JSON.stringify({ full_name: "Bob", account_type: "admin" }),
@@ -460,6 +461,35 @@ test("report share links: owner-only creation, public lookup by token, revoke, e
   await as(A, async () => {
     await db.query(`delete from public.reports where id = $1`, [reportId]);
     assert.equal((await one(`select count(*)::int n from public.report_shares`)).n, 0, "shares die with their report");
+  });
+});
+
+test("account deletion removes everything except an anonymised payment record", async () => {
+  const C = "33333333-3333-4333-8333-333333333333";
+  await db.query(`insert into auth.users (id, email, raw_user_meta_data) values ($1, 'c@test.dev', '{"full_name":"Carol"}')`, [C]);
+  await as(C, async () => {
+    const p = await one(`insert into public.properties (project_name) values ('Carol Tower') returning id`);
+    const i = await one(`insert into public.inspections (property_id) values ($1) returning id`, [p.id]);
+    await db.query(`insert into public.defects (inspection_id, title, category) values ($1, 'Crack', 'architectural')`, [i.id]);
+  });
+  // Written by the server (webhook) in real life.
+  await db.query(
+    `insert into public.payments (user_id, kind, amount_cents, currency, status, provider_txn_id, callback, paid_at)
+     values ($1, 'pro_annual', 249900, 'EGP', 'paid', 'txn-c-1', '{"billing_data":{"email":"c@test.dev","phone_number":"+201000000000"}}', now())`,
+    [C],
+  );
+  await db.query(`insert into public.subscriptions (user_id, plan_id, current_period_start, current_period_end) values ($1, 'pro_annual', now(), now() + interval '1 year')`, [C]);
+
+  await db.query(`delete from auth.users where id = $1`, [C]);
+
+  for (const [table, col] of [["profiles", "id"], ["properties", "owner_id"], ["inspections", "owner_id"], ["defects", "owner_id"], ["subscriptions", "user_id"]]) {
+    assert.equal((await one(`select count(*)::int n from public.${table} where ${col} = $1`, [C])).n, 0, `${table} not deleted`);
+  }
+  const pay = await one(`select user_id, callback, amount_cents, provider_txn_id from public.payments where provider_txn_id = 'txn-c-1'`);
+  assert.deepEqual(pay, { user_id: null, callback: null, amount_cents: 249900, provider_txn_id: "txn-c-1" });
+  await as(B, async () => {
+    const list = await rows(`select email, amount_cents from public.admin_list_payments()`);
+    assert.ok(list.some((p) => p.email === null && p.amount_cents === 249900), "admins still see the anonymised payment");
   });
 });
 

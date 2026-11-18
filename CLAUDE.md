@@ -15,7 +15,7 @@ This folder is **SNAGIT**, a property inspection & snagging SaaS. The `CLAUDE.md
 - `docs/decisions.md`: technical decisions. `README.md`: setup, schema, roadmap. `CHANGELOG.md`.
 
 ## Rules
-- Every server action: validate with zod → `authed()` → RLS-scoped client. The service-role key is allowed in exactly three places: Paymob checkout/webhook (`lib/payments`) and the share download route (`app/s/[token]/download`), each after the request is verified. Never in admin flows: admins act through RLS admin policies and `admin_*` SQL functions (D-011).
+- Every server action: validate with zod → `authed()` → RLS-scoped client. The service-role key is allowed only in: Paymob checkout/webhook (`lib/payments`), the share download route (`app/s/[token]/download`) and self-service account deletion (`_actions/account.ts`, for the caller's own id only), each after the request is verified. Deleting an auth user must delete the profile first as service_role, then call `auth.admin.deleteUser`: Supabase Auth's own cascade fails on our tables (D-015). Never in admin flows: admins act through RLS admin policies and `admin_*` SQL functions (D-011).
 - New UI text goes into both `en.ts` and `ar.ts`. Use logical CSS (`ms-`/`me-`/`start-`/`end-`) and add `flip-rtl` to directional icons.
 - No fake buttons: don't link to features that don't exist yet. Features that need a missing key are hidden, not disabled.
 - All 7 stages are built. Live tests still need keys: AI (ANTHROPIC_API_KEY, migration 0005), Paymob (PAYMOB_* + SUPABASE_SERVICE_ROLE_KEY), share links (SUPABASE_SERVICE_ROLE_KEY, migration 0007). Backlog is in the README roadmap.

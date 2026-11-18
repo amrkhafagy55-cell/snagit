@@ -11,8 +11,9 @@ import { formatPrice, getPlans } from "@/lib/billing";
 import { Check } from "lucide-react";
 import { LegalFooterLinks } from "@/components/legal-shell";
 
-export default async function LandingPage() {
+export default async function LandingPage({ searchParams }: PageProps<"/">) {
   const { t, lang } = await getI18n();
+  const accountDeleted = (await searchParams).account === "deleted";
   const user = isSupabaseConfigured() ? await getUser() : null;
   const plans = isSupabaseConfigured() ? await getPlans().catch(() => []) : [];
   const priced = (id: string) => plans.find((p) => p.id === id);
@@ -53,6 +54,11 @@ export default async function LandingPage() {
       </header>
 
       <main className="flex-1">
+        {accountDeleted && (
+          <p role="status" className="border-b border-emerald-200 bg-emerald-50 px-4 py-3 text-center text-sm font-medium text-emerald-800">
+            {t.settings.deletedNotice}
+          </p>
+        )}
         <section className="relative overflow-hidden bg-gradient-to-b from-navy-50 to-white">
           <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 md:grid-cols-2 md:py-24">
             <div>

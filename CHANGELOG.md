@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.1 — 2026-11-18 — Delete account
+- **Settings → Delete account:** type your e-mail, confirm, and everything is removed: files in all buckets, inspections, share links, the profile and the sign-in account. You're signed out and see a confirmation on the home page. Admins can't delete themselves.
+- Migration `0008_account_deletion.sql`: payment records survive with `user_id = null`, and the stored Paymob callback (payer details) is wiped. The admin payment list still shows them.
+- Fixed: Supabase's `deleteUser` alone fails with "Database error deleting user" once a user has data. The profile is now deleted first as service_role (D-015).
+- Privacy policy updated to describe self-service deletion.
+- Tests: DB test for the deletion cascade and anonymised payments; E2E test that creates a throwaway account with a stored PDF, deletes it from Settings, and checks the user, files and session are gone.
+
 ## 0.7.0 — 2026-11-18 — Stage 7: admin, share links, legal pages, security, E2E
 - **Admin dashboard** (`/admin`, admins only, 404 for others):
   - Overview KPIs and 30-day charts.

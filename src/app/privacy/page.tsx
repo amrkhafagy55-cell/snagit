@@ -40,13 +40,13 @@ const DOCS: Record<Lang, LegalDoc> = {
       {
         h: "How long we keep it",
         p: [
-          "Your content stays while your account is active or until you delete it. Deleting a property deletes its inspections, defects, photos and reports. Payment records are kept as long as accounting and tax rules require.",
+          "Your content stays while your account is active or until you delete it. Deleting an inspection deletes its defects, photos and reports; deleting your account deletes everything. Payment records are kept, without your name or contact details, as long as accounting and tax rules require.",
         ],
       },
       {
         h: "Your rights",
         p: [
-          "You can view and edit your profile and content in the app at any time. To get a copy of your data, correct it, or delete your account, contact us. We'll respond in line with Egypt's Personal Data Protection Law (Law No. 151 of 2020).",
+          "You can view and edit your profile and content in the app at any time. You can delete your account yourself under Settings → Delete account: it removes your profile, inspections, photos, floor plans, reports and share links straight away, and keeps payment records only without your name or contact details. To get a copy of your data or correct it, contact us. We'll respond in line with Egypt's Personal Data Protection Law (Law No. 151 of 2020).",
         ],
       },
       {
@@ -97,13 +97,13 @@ const DOCS: Record<Lang, LegalDoc> = {
       {
         h: "مدة الاحتفاظ بالبيانات",
         p: [
-          "يبقى محتواك طالما حسابك نشط أو حتى تحذفه. حذف العقار يحذف فحوصاته وعيوبه وصوره وتقاريره. نحتفظ بسجلات الدفع للمدة التي تتطلبها قواعد المحاسبة والضرائب.",
+          "يبقى محتواك طالما حسابك نشط أو حتى تحذفه. حذف الفحص يحذف عيوبه وصوره وتقاريره، وحذف الحساب يحذف كل شيء. نحتفظ بسجلات الدفع، بدون اسمك أو بيانات التواصل معك، للمدة التي تتطلبها قواعد المحاسبة والضرائب.",
         ],
       },
       {
         h: "حقوقك",
         p: [
-          "يمكنك عرض وتعديل ملفك الشخصي ومحتواك داخل التطبيق في أي وقت. للحصول على نسخة من بياناتك أو تصحيحها أو حذف حسابك، تواصل معنا. سنرد وفقًا لقانون حماية البيانات الشخصية المصري (القانون رقم 151 لسنة 2020).",
+          "يمكنك عرض وتعديل ملفك الشخصي ومحتواك داخل التطبيق في أي وقت. ويمكنك حذف حسابك بنفسك من الإعدادات ← حذف الحساب: يحذف ذلك فورًا ملفك الشخصي وفحوصاتك وصورك ومساقطك وتقاريرك وروابط المشاركة، ولا يُبقي إلا سجلات الدفع بدون اسمك أو بيانات التواصل معك. للحصول على نسخة من بياناتك أو تصحيحها، تواصل معنا. سنرد وفقًا لقانون حماية البيانات الشخصية المصري (القانون رقم 151 لسنة 2020).",
         ],
       },
       {
