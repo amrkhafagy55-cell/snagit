@@ -5,6 +5,7 @@ import { Alert, Button } from "@/components/ui";
 import { SeverityBadge } from "@/components/badges";
 import { useErrorText, useI18n } from "@/lib/i18n/client";
 import { categoryLabel } from "@/lib/i18n";
+import { useCategories } from "@/components/category-provider";
 import { photoForAi } from "@/lib/photos";
 import type { DefectSuggestion } from "@/lib/ai/defect-assistant";
 import type { Lang, Severity } from "@/lib/types";
@@ -41,6 +42,7 @@ export function AiAssistant({
   onApply: (field: Field, value: string) => void;
 }) {
   const { t, lang: uiLang } = useI18n();
+  const { labels } = useCategories();
   const errorText = useErrorText();
   const [lang, setLang] = useState<Lang>(uiLang);
   const [result, setResult] = useState<DefectSuggestion | null>(null);
@@ -80,7 +82,7 @@ export function AiAssistant({
     ? ([
         { field: "title", label: t.defect.title, value: result.title },
         result.category !== "other"
-          ? { field: "category", label: t.defect.category, value: result.category, display: categoryLabel(result.category, t) }
+          ? { field: "category", label: t.defect.category, value: result.category, display: categoryLabel(result.category, t, labels) }
           : null,
         {
           field: "severity",

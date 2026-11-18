@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.7.0 — 2026-11-18 — Stage 7: admin, share links, legal pages, security, E2E
+- **Admin dashboard** (`/admin`, admins only, 404 for others):
+  - Overview KPIs and 30-day charts.
+  - Users: search, account type, grant, extend or end Pro.
+  - Inspections: metadata only.
+  - Plans editor, subscriptions and payments.
+  - Checklist templates per room type.
+  - Defect categories (EN/AR).
+  - App settings: announcement banner, support contacts, AI daily limit.
+  - Append-only activity log with diffs.
+- **Report share links:** 7, 30 or 90 days, a branded public page, a download count, revoke at any time, and a 60-second signed download. Needs the service-role key.
+- **Admin-managed defect categories** are used in the defect form, checklist, defect pages and PDF reports.
+- **Announcement banner** on every app page, set in Admin → Settings.
+- **Legal pages** (drafts, EN/AR): Privacy, Terms, Refund, plus a Contact page from Admin → Settings. They're linked from the landing footer and sign-up.
+- **Security review** (`docs/security-review.md`):
+  - Fixed an open redirect in the auth callback.
+  - Report PDFs are now deleted with their inspection.
+  - Added CSP and security headers.
+  - Capped report generation at 30 per user per hour.
+  - A DB test asserts RLS and pinned `search_path` everywhere.
+- **Tests:**
+  - 17 DB tests (5 new: admin guard, admin functions and audit, config tables, share links, security baseline).
+  - 7 unit tests (3 new for the redirect guard).
+  - Playwright E2E: 7 public checks on desktop and mobile, plus a signed-in journey that runs when `E2E_EMAIL`/`E2E_PASSWORD` are set.
+- Migration `0007_admin.sql`. Decisions D-011 to D-014.
+
 ## 0.6.1 — 2026-11-18 — First production deployment
 - Live on Vercel: https://snagit-delta.vercel.app (Hobby plan, functions in `dub1` next to Supabase `eu-west-1`).
 - `vercel.json` (region), `.vercelignore` (no `.env*` uploads), `siteUrl()` falls back to the Vercel production domain.

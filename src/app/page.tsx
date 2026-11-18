@@ -9,6 +9,7 @@ import { getUser } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { formatPrice, getPlans } from "@/lib/billing";
 import { Check } from "lucide-react";
+import { LegalFooterLinks } from "@/components/legal-shell";
 
 export default async function LandingPage() {
   const { t, lang } = await getI18n();
@@ -186,6 +187,7 @@ export default async function LandingPage() {
           <p>{t.landing.footer}</p>
           <p dir="ltr">© {new Date().getFullYear()} SNAGIT</p>
         </div>
+        <LegalFooterLinks t={t} className="px-4 pb-8 text-sm text-navy-500" />
       </footer>
     </div>
   );

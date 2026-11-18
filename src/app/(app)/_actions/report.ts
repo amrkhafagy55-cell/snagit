@@ -9,8 +9,10 @@ import { PdfEngineUnavailable } from "@/lib/report/chrome";
 import type { ActionResult, Lang } from "@/lib/types";
 import { todayIso } from "@/lib/i18n";
 import { ActionError, authed, fail } from "./common";
+import { getCategoryLabels } from "@/lib/categories";
 
 const input = z.object({ inspectionId: z.uuid(), lang: z.enum(["en", "ar"]) });
+const REPORTS_PER_HOUR = 30;
 
 function slug(s: string) {
   return (
@@ -35,6 +37,12 @@ export async function generateReportAction(
   if (!parsed.success) return { ok: false, error: "invalid" };
   try {
     const { user, supabase } = await authed();
+    // Each report starts a headless Chromium; cap bursts per user (RLS: own reports only).
+    const { count: recent } = await supabase
+      .from("reports")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", new Date(Date.now() - 3600_000).toISOString());
+    if ((recent ?? 0) >= REPORTS_PER_HOUR) throw new ActionError("rateLimited");
     const data = await collectReportData(supabase, inspectionId, user.id);
 
     const { data: last } = await supabase
@@ -50,7 +58,8 @@ export async function generateReportAction(
     const { data: unlocked } = await supabase.rpc("inspection_unlocked", { p_inspection: inspectionId });
     const preview = unlocked !== true;
 
-    const html = buildReportHtml(data, { version, generatedAt, lang, preview }, await fontFaceCss());
+    const categoryLabels = await getCategoryLabels(lang);
+    const html = buildReportHtml(data, { version, generatedAt, lang, preview, categoryLabels }, await fontFaceCss());
     // Footer stays Latin-only: header/footer templates can't use the embedded fonts (no Arabic glyphs on servers).
     const { pdf, pageCount } = await renderPdf(html, `${preview ? "PREVIEW · " : ""}SNAGIT · v${version} · ${todayIso()}`);
 

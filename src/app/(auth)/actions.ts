@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { siteUrl } from "@/lib/supabase/env";
 import { getEnabledProviders } from "@/lib/supabase/providers";
 import { getI18n } from "@/lib/i18n/server";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 
 export type AuthState = {
   error?: string;
@@ -17,8 +18,7 @@ const email = z.email("invalidEmail");
 const password = z.string().min(8, "passwordShort").max(72, "tooLong");
 
 function safeNext(value: FormDataEntryValue | null): string {
-  const v = typeof value === "string" ? value : "";
-  return v.startsWith("/") && !v.startsWith("//") && !v.startsWith("/\\") ? v : "/dashboard";
+  return safeRedirectPath(value);
 }
 
 function mapAuthError(code: string | undefined, status?: number): string {

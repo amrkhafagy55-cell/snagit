@@ -2,8 +2,8 @@ import "server-only";
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getActiveCategoryKeys } from "@/lib/categories";
 import {
-  STANDARD_CATEGORIES,
   type ChecklistItem, type Defect, type DefectPhoto, type Inspection, type InspectionSummary, type Property, type Room,
 } from "@/lib/types";
 
@@ -137,15 +137,16 @@ export async function getDefect(inspectionId: string, defectId: string) {
   return { defect: normDefect(defect as Defect), photos: list.map((p) => ({ ...p, url: urls.get(p.storage_path) ?? null })) };
 }
 
-/** Standard categories first, then any custom ones used in this inspection. */
+/** Active admin-managed categories first, then any other ones already used in this inspection. */
 export async function getCategories(inspectionId: string) {
   const supabase = await createClient();
-  const [{ data: items }, { data: defects }] = await Promise.all([
+  const [{ data: items }, { data: defects }, active] = await Promise.all([
     supabase.from("checklist_items").select("category").eq("inspection_id", inspectionId),
     supabase.from("defects").select("category").eq("inspection_id", inspectionId),
+    getActiveCategoryKeys(),
   ]);
   const used = [...(items ?? []), ...(defects ?? [])].map((r) => r.category as string);
-  return [...new Set([...STANDARD_CATEGORIES, ...used])];
+  return [...new Set([...active, ...used])];
 }
 
 export async function signedUrls(bucket: string, paths: string[], expiresIn = 3600) {

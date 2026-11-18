@@ -2,7 +2,7 @@
 
 SNAGIT helps apartment buyers, owners, inspectors and civil engineers inspect newly delivered units room by room, record construction defects with photos, and track each defect until it is fixed. Arabic (RTL) and English.
 
-**Status:** Stages 1–6 of 7 are built (see [Roadmap](#roadmap)). Two parts can't run end to end until you add external credentials: the AI assistant (Stage 5, needs an Anthropic API key) and Paymob checkout (Stage 6, needs Paymob keys and the Supabase service-role key). The admin panel (Stage 7) is not built yet.
+**Status:** all 7 stages are built (see [Roadmap](#roadmap)). Three parts can't run end to end until you add external credentials: the AI assistant (needs an Anthropic API key), Paymob checkout (needs Paymob keys) and report share links (need the Supabase service-role key, which Paymob needs too). See [Features that need external credentials](#features-that-need-external-credentials).
 
 **Live:** https://snagit-delta.vercel.app (Vercel, see [Deployment](#deployment-vercel)).
 
@@ -14,9 +14,10 @@ SNAGIT helps apartment buyers, owners, inspectors and civil engineers inspect ne
 | Styling | Tailwind CSS 4, lucide-react icons, Inter + IBM Plex Sans Arabic |
 | Backend | Supabase: Postgres, Auth, Storage, Row Level Security |
 | Validation | zod (server side, every action) |
-| Tests | Node test runner + PGlite (real Postgres in-process) for schema and RLS |
+| Tests | Node test runner + PGlite (real Postgres in-process) for schema and RLS; Playwright (installed Chrome) for end-to-end |
+| Hosting | Vercel (functions in `dub1`), Supabase in `eu-west-1` |
 
-## What works today (Stages 1–6)
+## What works today (Stages 1–7)
 
 - **Auth:** email + password sign-up and sign-in, Google sign-in (once enabled in Supabase), password reset by e-mail, change password, sign out. Account types: *Individual* and *Professional Inspector*. *Administrator* can only be granted in SQL.
 - **Profile settings:** name, phone, company, account type, language.
@@ -31,7 +32,23 @@ SNAGIT helps apartment buyers, owners, inspectors and civil engineers inspect ne
 - **PDF reports (Stage 4):** a Report tab generates a real A4 PDF on the server (headless Chromium) in English or Arabic, with full RTL and correct Arabic shaping. It contains a cover page (logo, project, unit details, inspector, overall assessment, KPIs), an executive summary (severity and room breakdowns, checklist completion), the floor plan with numbered, severity-coloured defect locations, a defect register (description, location, responsible party, recommended action, reinspection notes, before/after photos side by side), room-by-room checklist results, final remarks (observations, recommendations, outstanding defects), signature boxes for inspector and owner, a disclaimer, and page numbers. Every generation is a **new version** stored privately; earlier versions stay downloadable.
 - **AI defect assistant (Stage 5, optional):** in the new/edit defect form, **Analyze photos** (vision) and **Improve wording** return a structured suggestion: title, category, severity with a reason, description, recommended action, possible causes, potentially serious visible issues and checks to do on site. It's always labelled *preliminary*: each field has its own **Use** button, and nothing is saved until the user saves the defect. The prompt forbids claiming a photo proves structural safety or a definitive cause. It runs on `claude-opus-5-5` (structured outputs, `fallbacks: "default"` for safety-classifier declines), server-side only. Every call is logged in `ai_requests`, with a per-user daily limit (`AI_DAILY_LIMIT`, default 30) that fails closed. The assistant is hidden when `ANTHROPIC_API_KEY` isn't set.
 - **Plans & payments (Stage 6):** **Free** (1 active inspection, 10 defects per inspection, watermarked PREVIEW report, floor plan view-only, no after-correction photos), **Pro annual** (EGP 2,499) and **Single report** (EGP 399, unlocks that whole inspection). Prices and limits live in the `plans` table. Limits are enforced by **database triggers** (`SNAGIT_LIMIT:*` errors become upgrade prompts in the UI), so they can't be bypassed through the API. Checkout uses **Paymob** (Intention API + hosted Unified Checkout). Only the **HMAC-SHA512-verified webhook** marks a payment paid, after checking the amount and currency, and it's idempotent. The return page only reads status. Without Paymob keys, prices are shown but there are no buy buttons. Billing page, payment history, landing-page pricing, a dashboard plan chip and Settings plan card are included.
-- **Security:** RLS on every table means a user only ever reads or writes their own rows. Storage buckets are private and every file sits under `<user_id>/…`, enforced by storage policies. MIME types and size limits are enforced by Storage itself. Photos are served through signed URLs that expire after 1 hour. The browser only ever gets the anon key.
+- **Admin dashboard (Stage 7):** `/admin`, visible only to administrators (everyone else gets a 404, and the database refuses them too).
+  - **Overview:** users, Pro subscriptions, inspections, defects, reports, revenue, payments, unlocks, AI requests and active share links, plus 30-day daily charts of new users, inspections and reports.
+  - **Users:** search, change account type (not your own), grant Pro until a date, extend it, or end it.
+  - **Inspections:** metadata only (project, owner email, status, defect and report counts). Admins can't open defect details, photos or reports.
+  - **Plans & billing:** edit names, prices, limits and whether a plan is offered; see subscriptions and payments with a status filter.
+  - **Checklists:** add, edit, reorder or hide default checklist items per room type. Changes apply to rooms created afterwards.
+  - **Categories:** add defect categories with Arabic and English names, rename, reorder or hide them. The defect form, checklist and reports use them.
+  - **Settings:** an announcement banner (EN/AR) shown on every app page, the support email and WhatsApp number shown on the Contact page, and the AI daily limit.
+  - **Activity:** an append-only audit log of every admin change, including field-by-field diffs of config edits.
+- **Report share links (Stage 7):** from the Report tab, share one report version through a link valid for 7, 30 or 90 days. Recipients get a branded page with a Download button, with no account needed. Owners see each active link's download count and can revoke it at any time. Tokens are 64 hex characters, links never leak through the Referer header, and downloads go through a 60-second signed URL. Needs `SUPABASE_SERVICE_ROLE_KEY` on the server; without it the Share button is hidden.
+- **Legal pages (Stage 7, drafts):** Privacy policy, Terms of use, Refund policy (EN/AR) and a Contact page, linked from the landing footer and the sign-up form. They're marked as drafts pending legal review.
+- **Security:**
+  - RLS on every table means a user only ever reads or writes their own rows. A DB test fails if any table loses RLS or any security-definer function has no pinned `search_path`.
+  - Storage buckets are private and every file sits under `<user_id>/…`, enforced by storage policies. MIME types and size limits are enforced by Storage itself. Photos are served through signed URLs that expire after 1 hour.
+  - The browser only ever gets the anon key; a build-time scan finds no server secret in client bundles.
+  - Security headers (CSP, HSTS, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy) are set, and redirects after sign-in are restricted to same-site paths.
+  - See `docs/security-review.md`.
 - **UX:** mobile-first layout with a bottom nav on phones, full RTL, loading skeletons, empty states, an error boundary and a 404 page.
 
 ## Setup
@@ -45,6 +62,7 @@ SNAGIT helps apartment buyers, owners, inspectors and civil engineers inspect ne
    - `supabase/migrations/0004_reports.sql`: report version summaries and immutable report rows (Stage 4).
    - `supabase/migrations/0005_ai_requests.sql`: AI usage log for the daily limit (Stage 5; the assistant refuses to run without it).
    - `supabase/migrations/0006_billing.sql`: plans, payments, subscriptions, per-inspection unlocks and Free-plan limit triggers (Stage 6).
+   - `supabase/migrations/0007_admin.sql`: admin functions and audit log, defect categories, app settings, report share links (Stage 7). Needs 0005 first.
 3. Under **Authentication → URL Configuration**:
    - Site URL: `http://localhost:3000` (your production URL later)
    - Redirect URLs: `http://localhost:3000/auth/callback` (plus the production equivalent)
@@ -64,17 +82,19 @@ npm run dev                  # http://localhost:3000
 ```
 Without the env values the app still starts and shows a "Connect Supabase" screen.
 
-### Grant Pro manually (support or testing without payments)
-```sql
-insert into public.subscriptions (user_id, plan_id, current_period_start, current_period_end)
-select id, 'pro_annual', now(), now() + interval '1 year' from auth.users where email = 'someone@example.com'
-on conflict (user_id) do update set status = 'active', current_period_end = excluded.current_period_end;
-```
-
-### 3. Make yourself an admin (for later stages)
+### 3. Make yourself an admin (once, in SQL)
 ```sql
 update public.profiles set role = 'admin' where id = (select id from auth.users where email = 'you@example.com');
 ```
+After that, the **Admin** link appears in the navigation. Other admins and manual Pro grants are managed in **Admin → Users**; every change lands in **Admin → Activity**.
+
+### 4. End-to-end tests (optional)
+Create a dedicated test account (not an admin, Free plan, confirmed e-mail) and add it to `.env.local`:
+```
+E2E_EMAIL=e2e+snagit@example.com
+E2E_PASSWORD=...
+```
+`npm run test:e2e` starts (or reuses) the dev server and runs in your installed Google Chrome. The public tests run on desktop and a mobile viewport. The signed-in test creates an inspection, adds a defect, generates a report, shares and revokes a link, then deletes everything it created. Without the two values it is skipped. Set `E2E_BASE_URL` to test a deployed site.
 
 ## Scripts
 | Command | What it does |
@@ -83,8 +103,9 @@ update public.profiles set role = 'admin' where id = (select id from auth.users 
 | `npm run build` / `npm start` | Production build / serve |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | Generates route types, runs `tsc` |
-| `npm test` | Unit tests (Paymob HMAC) + database tests |
-| `npm run test:db` | Runs both migrations on in-process Postgres and checks the triggers, numbering, summary view, RLS isolation and storage rules |
+| `npm test` | Unit tests (Paymob HMAC, redirect guard) + database tests |
+| `npm run test:db` | Runs all migrations on in-process Postgres and checks the triggers, numbering, limits, RLS isolation, storage rules, admin functions, share links and the security baseline |
+| `npm run test:e2e` | Playwright end-to-end tests in the installed Chrome (see Setup step 4) |
 
 ## Deployment (Vercel)
 `vercel.json` pins functions to `dub1` (Dublin), next to the Supabase project in `eu-west-1`. If your Supabase project is in another region, change it to the closest [Vercel region](https://vercel.com/docs/regions). `.vercelignore` keeps `.env*` files out of CLI uploads.
@@ -115,6 +136,9 @@ profiles ─1:n─ properties ─1:n─ inspections ─┬─1:n─ rooms ─1:n
                                              └─1:n─ reports (Stage 4, versioned)
 checklist_templates (global, admin-managed) → copied into checklist_items when a room is created
 view inspection_summaries (security_invoker) → dashboard and workspace counts
+plans · payments · subscriptions · inspection_unlocks (Stage 6)
+reports ─1:n─ report_shares (Stage 7: token, expiry, revoke, download count)
+defect_categories · app_settings · admin_audit (Stage 7, admin-managed)
 ```
 - Every child table has an `owner_id` (default `auth.uid()`), so each RLS check is a single comparison. Write policies also check that the parent row belongs to the same user.
 - `defects.number` is assigned per inspection by a trigger, with an advisory lock so concurrent inserts can't collide.
@@ -132,7 +156,9 @@ view inspection_summaries (security_invoker) → dashboard and workspace counts
 | Production e-mails (confirm, reset) | Custom SMTP in Supabase (the built-in sender is rate-limited) | 1 |
 | AI defect assistant | `ANTHROPIC_API_KEY` from console.anthropic.com (server-only, prepaid credits; roughly $0.03–0.05 per analysis of 1–3 photos), plus migration 0005 | 5 |
 | Subscriptions / pay-per-report | Paymob account: `PAYMOB_SECRET_KEY`, `PAYMOB_PUBLIC_KEY`, `PAYMOB_HMAC_SECRET`, `PAYMOB_INTEGRATION_IDS` (test keys first), plus `SUPABASE_SERVICE_ROLE_KEY`. Set the Paymob transaction callback to `<SITE_URL>/api/payments/paymob/webhook`; Paymob can't reach localhost, so use a public URL or a tunnel when testing | 6 |
-| Admin jobs, PDF storage cleanup | `SUPABASE_SERVICE_ROLE_KEY` (server-only) | 4, 7 |
+| Report share links | `SUPABASE_SERVICE_ROLE_KEY` (server-only), plus migration 0007 | 7 |
+| Contact page details | Support email / WhatsApp set in **Admin → Settings** | 7 |
+| Legal pages | Review by a lawyer, the operator's legal name and address, and a decision on the refund windows | 7 |
 
 ## Roadmap
 
@@ -144,6 +170,7 @@ view inspection_summaries (security_invoker) → dashboard and workspace counts
 | 4 | Server-side PDF reports (EN/AR, RTL, cover, summary, photos, numbered plan, signatures, versions) | Done |
 | 5 | AI defect assistant (suggestions are always labelled preliminary and need human confirmation) | Built; awaiting API key for live test |
 | 6 | Plans (Free / Pro annual / pay-per-report), payment integration in test mode, feature limits | Built; awaiting Paymob test keys for an end-to-end payment |
-| 7 | Admin dashboard, sharing, security review, E2E tests, deployment hardening | Next |
+| 7 | Admin dashboard, report share links, legal pages, security review and hardening, E2E tests, deployment | Done |
+| Later | Account deletion from Settings, invite collaborators to an inspection, custom domain, Supabase custom SMTP | Backlog |
 
 See `docs/decisions.md` for the main technical decisions and `CHANGELOG.md` for changes.

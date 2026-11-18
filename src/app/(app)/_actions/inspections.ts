@@ -131,6 +131,12 @@ export async function deleteInspectionAction(inspectionId: string): Promise<Acti
     for (let i = 0; i < photoPaths.length; i += 100) {
       await supabase.storage.from("defect-photos").remove(photoPaths.slice(i, i + 100));
     }
+    // Report PDFs too: the rows cascade, but the files would otherwise stay in storage.
+    const { data: reports } = await supabase.from("reports").select("storage_path").eq("inspection_id", inspectionId);
+    const reportPaths = (reports ?? []).map((r) => r.storage_path as string);
+    for (let i = 0; i < reportPaths.length; i += 100) {
+      await supabase.storage.from("reports").remove(reportPaths.slice(i, i + 100));
+    }
 
     const { error } = await supabase.from("inspections").delete().eq("id", inspectionId);
     if (error) throw error;

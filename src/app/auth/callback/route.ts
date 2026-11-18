@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 
 // Handles OAuth (Google), sign-up confirmation and password-recovery links.
 export async function GET(request: NextRequest) {
@@ -8,8 +9,7 @@ export async function GET(request: NextRequest) {
   const code = url.searchParams.get("code");
   const tokenHash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type") as EmailOtpType | null;
-  const rawNext = url.searchParams.get("next") ?? "/dashboard";
-  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/dashboard";
+  const next = safeRedirectPath(url.searchParams.get("next"));
 
   const supabase = await createClient();
   let ok = false;

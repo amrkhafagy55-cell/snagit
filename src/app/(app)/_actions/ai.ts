@@ -7,6 +7,7 @@ import {
 } from "@/lib/ai/defect-assistant";
 import { SEVERITIES, type ActionResult } from "@/lib/types";
 import { ActionError, authed, fail } from "./common";
+import { getAppSettings } from "@/lib/settings";
 
 const MAX_IMAGES = 3;
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024; // decoded; browser sends ~1280px JPEGs, stored photos are ≤2048px
@@ -56,7 +57,9 @@ export async function aiSuggestAction(raw: z.input<typeof inputSchema>): Promise
       console.error("[ai] usage log unavailable — run supabase/migrations/0005_ai_requests.sql", countErr?.message);
       throw new ActionError("aiUnavailable");
     }
-    if (count >= aiDailyLimit()) throw new ActionError("aiLimit");
+    // Admin → Settings overrides the server default (AI_DAILY_LIMIT, else 30).
+    const limit = Number((await getAppSettings()).ai_daily_limit) || aiDailyLimit();
+    if (count >= limit) throw new ActionError("aiLimit");
 
     const images: AssistantInput["images"] = [];
     for (const uri of v.images) {

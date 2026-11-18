@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import { Download, FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { assertUuid } from "@/lib/data";
-import { formatNumber } from "@/lib/i18n";
+import { fill, formatNumber } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n/server";
+import { getActiveShares, isSharingEnabled } from "@/lib/shares";
 import { ReportGenerator } from "./report-generator";
+import { ShareButton, ShareList, type ShareRow } from "./share-controls";
 import { CheckoutButton } from "@/components/billing/checkout-button";
 import { getProfile } from "@/lib/auth";
 import { formatPrice, getPlans, isInspectionUnlocked } from "@/lib/billing";
@@ -44,6 +46,19 @@ export default async function ReportPage({ params }: PageProps<"/inspections/[id
     .eq("inspection_id", id)
     .order("version", { ascending: false });
   const reports = (data ?? []) as ReportRow[];
+  const sharing = isSharingEnabled();
+  const shares = sharing ? await getActiveShares(id) : [];
+  const reportById = new Map(reports.map((r) => [r.id, r]));
+  const shareRows: ShareRow[] = shares.map((s) => {
+    const r = reportById.get(s.report_id);
+    return {
+      id: s.id,
+      url: s.url,
+      expires_at: s.expires_at,
+      view_count: s.view_count,
+      label: r ? fill(t.share.forVersion, { v: r.version, lang: r.language === "ar" ? "العربية" : "English" }) : t.share.title,
+    };
+  });
 
   const urls = new Map<string, string>();
   if (reports.length) {
@@ -143,9 +158,17 @@ export default async function ReportPage({ params }: PageProps<"/inspections/[id
                     {t.report.download}
                   </a>
                 )}
+                {sharing && <ShareButton reportId={rep.id} />}
               </li>
             ))}
           </ul>
+        )}
+        {sharing && reports.length > 0 && (
+          <div className="mt-6">
+            <h2 className="text-lg font-bold text-navy-900">{t.share.title}</h2>
+            <p className="mb-3 text-sm text-navy-500">{t.share.hint}</p>
+            <ShareList shares={shareRows} />
+          </div>
         )}
       </section>
     </div>

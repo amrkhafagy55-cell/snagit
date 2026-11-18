@@ -193,7 +193,16 @@ export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
           </div>
         </fieldset>
         <Submit label={t.auth.signUp} pending={t.auth.signingUp} />
-        <p className="text-xs text-navy-400">{t.auth.terms}</p>
+        <p className="text-xs text-navy-400">
+          {t.auth.terms}{" "}
+          <Link href="/terms" target="_blank" className="font-semibold text-navy-600 underline">
+            {t.legal.terms}
+          </Link>
+          {" · "}
+          <Link href="/privacy" target="_blank" className="font-semibold text-navy-600 underline">
+            {t.legal.privacy}
+          </Link>
+        </p>
       </form>
       <p className="mt-6 text-center text-sm text-navy-500">
         {t.auth.haveAccount}{" "}

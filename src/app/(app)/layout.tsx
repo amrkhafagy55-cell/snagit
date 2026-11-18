@@ -8,6 +8,10 @@ import { getProfile, requireUser } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { signOutAction } from "../(auth)/actions";
+import { CategoryProvider } from "@/components/category-provider";
+import { getActiveCategoryKeys, getCategoryLabels } from "@/lib/categories";
+import { getAppSettings } from "@/lib/settings";
+import { Megaphone } from "lucide-react";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   if (!isSupabaseConfigured()) {
@@ -18,19 +22,35 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     );
   }
   const user = await requireUser();
-  const [profile, { t }] = await Promise.all([getProfile(), getI18n()]);
+  const [profile, { t, lang }, settings, activeCategories] = await Promise.all([
+    getProfile(),
+    getI18n(),
+    getAppSettings(),
+    getActiveCategoryKeys(),
+  ]);
+  const categoryLabels = await getCategoryLabels(lang);
   const name = profile?.full_name || user.email;
   const initial = (name || "?").trim().charAt(0).toUpperCase();
+  const announcement = (lang === "ar" ? settings.announcement_ar || settings.announcement_en : settings.announcement_en || settings.announcement_ar).trim();
 
   return (
+    <CategoryProvider labels={categoryLabels} active={activeCategories}>
     <div className="flex min-h-full flex-1 flex-col">
+      {announcement && (
+        <div role="status" className="bg-accent-50 text-accent-800 border-b border-accent-200">
+          <p className="mx-auto flex max-w-6xl items-start gap-2 px-4 py-2 text-sm sm:px-6">
+            <Megaphone className="flip-rtl mt-0.5 size-4 shrink-0 text-accent-600" aria-hidden />
+            <span>{announcement}</span>
+          </p>
+        </div>
+      )}
       <header className="sticky top-0 z-30 border-b border-navy-100 bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <div className="flex items-center gap-6">
             <Link href="/dashboard" aria-label={t.nav.dashboard}>
               <Logo />
             </Link>
-            <DesktopNav />
+            <DesktopNav isAdmin={profile?.role === "admin"} />
           </div>
           <div className="flex items-center gap-1">
             <LanguageToggle />
@@ -56,7 +76,8 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-28 pt-6 sm:px-6 md:pb-12">{children}</main>
-      <MobileNav />
+      <MobileNav isAdmin={profile?.role === "admin"} />
     </div>
+    </CategoryProvider>
   );
 }

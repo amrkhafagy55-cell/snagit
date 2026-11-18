@@ -15,10 +15,13 @@ This folder is **SNAGIT**, a property inspection & snagging SaaS. The `CLAUDE.md
 - `docs/decisions.md`: technical decisions. `README.md`: setup, schema, roadmap. `CHANGELOG.md`.
 
 ## Rules
-- Every server action: validate with zod → `authed()` → RLS-scoped client. Never use the service-role key in user flows.
+- Every server action: validate with zod → `authed()` → RLS-scoped client. The service-role key is allowed in exactly three places: Paymob checkout/webhook (`lib/payments`) and the share download route (`app/s/[token]/download`), each after the request is verified. Never in admin flows: admins act through RLS admin policies and `admin_*` SQL functions (D-011).
 - New UI text goes into both `en.ts` and `ar.ts`. Use logical CSS (`ms-`/`me-`/`start-`/`end-`) and add `flip-rtl` to directional icons.
-- No fake buttons: don't link to features that don't exist yet.
-- Stages 1–6 are done. Still needing external keys for a live test: Stage 5 AI (ANTHROPIC_API_KEY + migration 0005) and Stage 6 Paymob (PAYMOB_* + SUPABASE_SERVICE_ROLE_KEY). Next is Stage 7 (admin, sharing, security). Roadmap is in the README.
+- No fake buttons: don't link to features that don't exist yet. Features that need a missing key are hidden, not disabled.
+- All 7 stages are built. Live tests still need keys: AI (ANTHROPIC_API_KEY, migration 0005), Paymob (PAYMOB_* + SUPABASE_SERVICE_ROLE_KEY), share links (SUPABASE_SERVICE_ROLE_KEY, migration 0007). Backlog is in the README roadmap.
+- Admin: `/admin` (layout 404s non-admins), actions in `(app)/_actions/admin.ts`, SQL in `0007_admin.sql`. Every new admin capability needs an `assert_admin()` check in SQL and an audit entry. Admins see metadata only for other users' inspections; keep it that way unless the product owner decides otherwise.
+- Security: keep `docs/security-review.md` current. Redirect targets from user input go through `safeRedirectPath()`. New third-party origins must be added to the CSP in `next.config.ts`. `npm run test:db` asserts RLS on every table and pinned `search_path` on definer functions.
+- Tests: `npm test` (unit + DB) must pass before a commit; `npm run test:e2e` before a deploy (signed-in journey needs `E2E_EMAIL`/`E2E_PASSWORD` in `.env.local`; never print them).
 - Production: https://snagit-delta.vercel.app (Vercel project `khafagy/snagit`, linked in `.vercel/`, no Git remote yet). Deploy with `npx vercel deploy --prod` from this folder; in the user's PowerShell use `npx.cmd`, since script execution is disabled there. Add env vars with `vercel env add`, piping values from `.env.local` and never printing them. See D-010.
 - Billing: limits are DB triggers in `0006_billing.sql` (errors `SNAGIT_LIMIT:*` → `limit_*` codes in `_actions/common.ts`). Only `/api/payments/paymob/webhook` (HMAC-verified) may mark payments paid. Keep it that way.
 - AI: `src/lib/ai/defect-assistant.ts` (model, prompt, schema) + `(app)/_actions/ai.ts` (limits, logging). Load the claude-api skill before changing either; keep the "preliminary, human-confirmed" contract.

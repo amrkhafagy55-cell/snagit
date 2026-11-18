@@ -1,25 +1,27 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, PlusCircle, Settings } from "lucide-react";
+import { LayoutDashboard, PlusCircle, Settings, ShieldCheck } from "lucide-react";
 import { useI18n } from "@/lib/i18n/client";
 
-function useLinks() {
+function useLinks(isAdmin: boolean) {
   const { t } = useI18n();
-  return [
+  const links = [
     { href: "/dashboard", label: t.nav.dashboard, icon: LayoutDashboard, match: ["/dashboard", "/inspections"] },
     { href: "/properties/new", label: t.nav.newInspection, icon: PlusCircle, match: ["/properties"] },
     { href: "/settings", label: t.nav.settings, icon: Settings, match: ["/settings"] },
   ];
+  if (isAdmin) links.push({ href: "/admin", label: t.nav.admin, icon: ShieldCheck, match: ["/admin"] });
+  return links;
 }
 
 function isActive(path: string, match: string[]) {
   return match.some((m) => path === m || path.startsWith(m + "/"));
 }
 
-export function DesktopNav() {
+export function DesktopNav({ isAdmin = false }: { isAdmin?: boolean }) {
   const path = usePathname();
-  const links = useLinks();
+  const links = useLinks(isAdmin);
   return (
     <nav className="hidden items-center gap-1 md:flex">
       {links.map(({ href, label, icon: Icon, match }) => {
@@ -42,12 +44,12 @@ export function DesktopNav() {
   );
 }
 
-export function MobileNav() {
+export function MobileNav({ isAdmin = false }: { isAdmin?: boolean }) {
   const path = usePathname();
-  const links = useLinks();
+  const links = useLinks(isAdmin);
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-navy-100 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-      <div className="grid grid-cols-3">
+      <div className={`grid ${links.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
         {links.map(({ href, label, icon: Icon, match }) => {
           const active = isActive(path, match);
           return (

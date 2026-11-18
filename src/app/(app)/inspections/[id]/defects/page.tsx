@@ -6,6 +6,7 @@ import { DefectStatusBadge, SeverityBadge } from "@/components/badges";
 import { getDefects, getInspection } from "@/lib/data";
 import { categoryLabel, formatDate, roomLabel } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n/server";
+import { getCategoryLabels } from "@/lib/categories";
 import { DEFECT_STATUSES, SEVERITIES } from "@/lib/types";
 import { DefectFilters } from "./filters";
 
@@ -27,6 +28,7 @@ export default async function DefectsPage({ params, searchParams }: PageProps<"/
     .filter((d) => (!severity || d.severity === severity) && (!status || d.status === status) && (!room || d.room_id === room))
     .sort((a, b) => (sort === "severity" ? SEV_RANK[a.severity] - SEV_RANK[b.severity] || a.number - b.number : a.number - b.number));
   const roomMap = new Map(rooms.map((r) => [r.id, roomLabel(r, t)]));
+  const categoryLabels = await getCategoryLabels(lang);
 
   return (
     <div>
@@ -57,7 +59,7 @@ export default async function DefectsPage({ params, searchParams }: PageProps<"/
                   <div className="min-w-0">
                     <p className="font-semibold text-navy-950">{d.title}</p>
                     <p className="mt-0.5 truncate text-sm text-navy-500">
-                      {[d.room_id ? roomMap.get(d.room_id) : t.defect.noRoom, categoryLabel(d.category, t), formatDate(d.identified_on, lang)]
+                      {[d.room_id ? roomMap.get(d.room_id) : t.defect.noRoom, categoryLabel(d.category, t, categoryLabels), formatDate(d.identified_on, lang)]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>

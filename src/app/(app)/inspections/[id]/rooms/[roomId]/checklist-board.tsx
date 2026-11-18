@@ -6,7 +6,8 @@ import { Check, MessageSquare, Minus, Plus, Trash2, X, AlertOctagon } from "luci
 import { Alert, Button } from "@/components/ui";
 import { useErrorText, useI18n } from "@/lib/i18n/client";
 import { categoryLabel, itemTitle } from "@/lib/i18n";
-import { STANDARD_CATEGORIES, type ChecklistItem, type ChecklistResult } from "@/lib/types";
+import type { ChecklistItem, ChecklistResult } from "@/lib/types";
+import { useCategories } from "@/components/category-provider";
 import {
   addChecklistItemAction,
   deleteChecklistItemAction,
@@ -32,6 +33,7 @@ export function ChecklistBoard({
   defectByItem: Record<string, { id: string; number: number }>;
 }) {
   const { t, lang } = useI18n();
+  const { labels, active } = useCategories();
   const errorText = useErrorText();
   const router = useRouter();
   const [items, setItems] = useState(initialItems);
@@ -83,7 +85,7 @@ export function ChecklistBoard({
 
       {groups.map(([category, list]) => (
         <section key={category}>
-          <h3 className="mb-2 px-1 text-xs font-bold uppercase tracking-wider text-navy-400">{categoryLabel(category, t)}</h3>
+          <h3 className="mb-2 px-1 text-xs font-bold uppercase tracking-wider text-navy-400">{categoryLabel(category, t, labels)}</h3>
           <ul className="card divide-y divide-navy-50">
             {list.map((item) => {
               const defect = defectByItem[item.id];
@@ -181,7 +183,7 @@ export function ChecklistBoard({
 
       <AddItemForm
         roomId={roomId}
-        categories={[...new Set([...STANDARD_CATEGORIES, ...items.map((i) => i.category)])]}
+        categories={[...new Set([...active, ...items.map((i) => i.category)])]}
         onAdded={(item) => setItems((list) => [...list, item])}
       />
     </div>
@@ -242,6 +244,7 @@ function AddItemForm({
   onAdded: (item: ChecklistItem) => void;
 }) {
   const { t } = useI18n();
+  const { labels } = useCategories();
   const errorText = useErrorText();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -295,7 +298,7 @@ function AddItemForm({
           <select id="item-category" className="field-input" value={category} onChange={(e) => setCategory(e.target.value)}>
             {categories.map((c) => (
               <option key={c} value={c}>
-                {categoryLabel(c, t)}
+                {categoryLabel(c, t, labels)}
               </option>
             ))}
             <option value={NEW}>{t.checklist.customCategory}</option>

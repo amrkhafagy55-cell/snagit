@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_ANON_KEY, SUPABASE_URL, isSupabaseConfigured } from "@/lib/supabase/env";
 
-const PROTECTED_PREFIXES = ["/dashboard", "/properties", "/inspections", "/settings", "/billing"];
+const PROTECTED_PREFIXES = ["/dashboard", "/properties", "/inspections", "/settings", "/billing", "/admin"];
 const AUTH_PAGES = ["/login", "/register", "/forgot-password"];
 
 // Refreshes the Supabase session cookie on every request and does an optimistic

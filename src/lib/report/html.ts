@@ -32,11 +32,19 @@ export function esc(value: unknown): string {
 /** User-entered text: escaped, line breaks kept, direction detected per paragraph. */
 const u = (v: unknown) => `<span class="u">${esc(v).replace(/\r?\n/g, "<br>")}</span>`;
 
-export type ReportMeta = { version: number; generatedAt: Date; lang: Lang; preview: boolean };
+export type ReportMeta = {
+  version: number;
+  generatedAt: Date;
+  lang: Lang;
+  preview: boolean;
+  /** Admin-managed category names in the report language (getCategoryLabels). */
+  categoryLabels?: Record<string, string>;
+};
 
 export function buildReportHtml(data: ReportData, meta: ReportMeta, fontCss: string): string {
   const { lang } = meta;
   const t = getDictionary(lang);
+  const cat = (key: string) => categoryLabel(key, t, meta.categoryLabels);
   const r = t.report;
   const n = (v: number) => formatNumber(v, lang);
   const d = (v: string | null) => formatDate(v, lang);
@@ -256,7 +264,7 @@ export function buildReportHtml(data: ReportData, meta: ReportMeta, fontCss: str
               const meta2: [string, string][] = [
                 [t.defect.room, x.room_id ? roomName.get(x.room_id) ?? "" : t.defect.noRoom],
                 [r.location, x.location_note],
-                [t.defect.category, categoryLabel(x.category, t)],
+                [t.defect.category, cat(x.category)],
                 [t.defect.identified, d(x.identified_on)],
                 [t.defect.responsible, x.responsible_party],
                 [t.defect.correctedOn, x.corrected_on ? d(x.corrected_on) : ""],
@@ -304,7 +312,7 @@ export function buildReportHtml(data: ReportData, meta: ReportMeta, fontCss: str
         <table class="grid compact">
           <thead><tr><th>${esc(r.item)}</th><th>${esc(t.defect.category)}</th><th class="c">${esc(r.result)}</th><th>${esc(r.notes)}</th></tr></thead>
           <tbody>${list
-            .map((it) => `<tr><td>${u(itemTitle(it, lang))}</td><td>${u(categoryLabel(it.category, t))}</td>${resultCell(it.result)}<td>${it.notes ? u(it.notes) : ""}</td></tr>`)
+            .map((it) => `<tr><td>${u(itemTitle(it, lang))}</td><td>${u(cat(it.category))}</td>${resultCell(it.result)}<td>${it.notes ? u(it.notes) : ""}</td></tr>`)
             .join("")}</tbody>
         </table>
       </div>`;

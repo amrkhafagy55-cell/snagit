@@ -14,7 +14,7 @@ const STUBS = `
   create role anon nologin;
   create role authenticated nologin;
   create schema auth;
-  create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}'::jsonb);
+  create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}'::jsonb, last_sign_in_at timestamptz);
   create function auth.uid() returns uuid language sql stable as
     $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   create schema storage;
@@ -40,6 +40,14 @@ async function as(userId, fn) {
 }
 const one = async (sql, params) => (await db.query(sql, params)).rows[0];
 const rows = async (sql, params) => (await db.query(sql, params)).rows;
+async function asAnon(fn) {
+  await db.exec(`set role anon; select set_config('request.jwt.claim.sub', '', false);`);
+  try {
+    return await fn();
+  } finally {
+    await db.exec(`reset role;`);
+  }
+}
 
 let inspectionA;
 
@@ -51,6 +59,7 @@ before(async () => {
   await db.exec(readFileSync(new URL("../migrations/0004_reports.sql", import.meta.url), "utf8"));
   await db.exec(readFileSync(new URL("../migrations/0005_ai_requests.sql", import.meta.url), "utf8"));
   await db.exec(readFileSync(new URL("../migrations/0006_billing.sql", import.meta.url), "utf8"));
+  await db.exec(readFileSync(new URL("../migrations/0007_admin.sql", import.meta.url), "utf8"));
   await db.query(`insert into auth.users (id, email, raw_user_meta_data) values ($1, 'a@test.dev', $2), ($3, 'b@test.dev', $4)`, [
     A, JSON.stringify({ full_name: "Amina Inspector", account_type: "inspector", locale: "ar" }),
     B, JSON.stringify({ full_name: "Bob", account_type: "admin" }),
@@ -283,4 +292,190 @@ test("deleting the property cascades to everything", async () => {
       assert.equal(r.n, 0, `${t} not cascaded`);
     }
   });
+});
+
+// ---------------------------------------------------------------------------
+// Stage 7: admin functions, config tables, audit log, report share links
+// ---------------------------------------------------------------------------
+
+test("admin functions refuse non-admins and anonymous callers", async () => {
+  await as(A, async () => {
+    for (const sql of [
+      `select public.admin_stats()`,
+      `select * from public.admin_list_users()`,
+      `select * from public.admin_list_inspections()`,
+      `select * from public.admin_list_payments()`,
+      `select * from public.admin_list_audit()`,
+      `select public.admin_set_role('${A}', 'admin')`,
+      `select public.admin_grant_pro('${A}', now() + interval '30 days')`,
+    ]) {
+      await assert.rejects(db.query(sql), /SNAGIT_FORBIDDEN/, sql);
+    }
+    assert.equal((await one(`select role from public.profiles where id = $1`, [A])).role, "inspector");
+  });
+  await asAnon(async () => {
+    await assert.rejects(db.query(`select public.admin_stats()`), /permission denied/);
+  });
+});
+
+test("admins: analytics, user list, roles and manual Pro, all audited", async () => {
+  await db.query(`update public.profiles set role = 'admin' where id = $1`, [B]);
+  await as(B, async () => {
+    const stats = (await one(`select public.admin_stats() s`)).s;
+    assert.equal(stats.users, 2);
+    assert.equal(stats.daily.length, 30);
+    assert.ok("revenue" in stats && "by_role" in stats);
+
+    const all = await rows(`select * from public.admin_list_users()`);
+    assert.deepEqual(all.map((u) => u.email).sort(), ["a@test.dev", "b@test.dev"]);
+    assert.equal(Number(all[0].total_count), 2);
+    assert.equal((await rows(`select * from public.admin_list_users('a@test')`)).length, 1);
+    assert.equal((await rows(`select * from public.admin_list_users('%')`)).length, 0, "LIKE wildcards are escaped");
+
+    await db.query(`select public.admin_set_role($1, 'individual')`, [A]);
+    await assert.rejects(db.query(`select public.admin_set_role($1, 'individual')`, [B]), /SNAGIT_ADMIN:self/);
+    await assert.rejects(db.query(`select public.admin_set_role($1, 'owner')`, [A]), /SNAGIT_ADMIN:invalid_role/);
+
+    await assert.rejects(db.query(`select public.admin_grant_pro($1, now() - interval '1 day')`, [A]), /invalid_date/);
+    await db.query(`select public.admin_grant_pro($1, now() + interval '30 days')`, [A]);
+    assert.equal((await one(`select public.has_pro($1) p`, [A])).p, true);
+    await db.query(`select public.admin_cancel_pro($1)`, [A]);
+    assert.equal((await one(`select public.has_pro($1) p`, [A])).p, false);
+
+    const audit = await rows(`select action, admin_email from public.admin_list_audit()`);
+    assert.deepEqual(audit.map((a) => a.action).sort(), ["user.cancel_pro", "user.grant_pro", "user.set_role"]);
+    assert.ok(audit.every((a) => a.admin_email === "b@test.dev"));
+    await assert.rejects(db.query(`insert into public.admin_audit (action) values ('forged')`), /permission denied/);
+  });
+  await as(A, async () => {
+    assert.equal((await one(`select role from public.profiles where id = $1`, [A])).role, "individual");
+    assert.equal((await one(`select count(*)::int n from public.admin_audit`)).n, 0, "non-admins cannot read the audit log");
+  });
+});
+
+test("config tables: everyone reads, only admins edit (audited), plans keep sane prices", async () => {
+  await asAnon(async () => {
+    assert.equal((await one(`select count(*)::int n from public.defect_categories where is_active`)).n, 4);
+    assert.equal((await one(`select count(*)::int n from public.app_settings`)).n, 5);
+  });
+  await as(A, async () => {
+    const u = await db.query(`update public.plans set price_cents = 100 where id = 'pro_annual'`);
+    assert.equal(u.affectedRows ?? 0, 0);
+    await assert.rejects(db.query(`insert into public.defect_categories (key, name_en, name_ar) values ('hack', 'x', 'x')`), /row-level security/);
+    const s = await db.query(`update public.app_settings set value = 'x' where key = 'support_email'`);
+    assert.equal(s.affectedRows ?? 0, 0);
+  });
+  await as(B, async () => {
+    await db.query(`update public.plans set price_cents = 199900 where id = 'pro_annual'`);
+    await assert.rejects(db.query(`update public.plans set price_cents = 500 where id = 'free'`), /plans_price_sane/);
+    await assert.rejects(db.query(`update public.plans set is_active = false where id = 'free'`), /plans_free_always_active/);
+    await assert.rejects(db.query(`delete from public.plans where id = 'report'`), /permission denied/);
+
+    await db.query(`insert into public.defect_categories (key, name_en, name_ar, sort_order) values ('waterproofing', 'Waterproofing', 'عزل', 50)`);
+    await assert.rejects(db.query(`insert into public.defect_categories (key, name_en, name_ar) values ('Bad Key', 'x', 'x')`), /check/);
+    await assert.rejects(db.query(`delete from public.defect_categories where key = 'waterproofing'`), /permission denied/);
+    await db.query(`update public.defect_categories set is_active = false where key = 'mechanical'`);
+
+    await assert.rejects(db.query(`update public.app_settings set value = '0' where key = 'ai_daily_limit'`), /check/);
+    await db.query(`update public.app_settings set value = '50' where key = 'ai_daily_limit'`);
+
+    const audit = await rows(`select action, target_id, details from public.admin_audit where action like '%.update' or action like '%.insert' order by id`);
+    const price = audit.find((a) => a.action === "plans.update");
+    assert.deepEqual(price.details.price_cents, [249900, 199900]);
+    assert.ok(audit.some((a) => a.action === "defect_categories.insert" && a.target_id === "waterproofing"));
+    assert.ok(audit.some((a) => a.action === "app_settings.update" && a.target_id === "ai_daily_limit"));
+  });
+});
+
+test("report share links: owner-only creation, public lookup by token, revoke, expiry", async () => {
+  let reportId, inspectionId, token;
+  await as(A, async () => {
+    const p = await one(`insert into public.properties (project_name) values ('Shared Compound') returning id`);
+    inspectionId = (await one(`insert into public.inspections (property_id, inspector_name) values ($1, 'Eng. A') returning id`, [p.id])).id;
+    reportId = (await one(
+      `insert into public.reports (inspection_id, version, language, storage_path, byte_size, page_count) values ($1, 1, 'ar', $2, 1000, 3) returning id`,
+      [inspectionId, `${A}/${inspectionId}/r.pdf`],
+    )).id;
+    await assert.rejects(
+      db.query(`insert into public.report_shares (report_id, inspection_id, expires_at) values ($1, $2, now() + interval '200 days')`, [reportId, inspectionId]),
+      /check/,
+    );
+    const s = await one(
+      `insert into public.report_shares (report_id, inspection_id, expires_at) values ($1, $2, now() + interval '30 days') returning token`,
+      [reportId, inspectionId],
+    );
+    token = s.token;
+    assert.match(token, /^[0-9a-f]{64}$/);
+  });
+  await as(B, async () => {
+    await assert.rejects(
+      db.query(`insert into public.report_shares (report_id, inspection_id, expires_at) values ($1, $2, now() + interval '7 days')`, [reportId, inspectionId]),
+      /row-level security/,
+      "even an admin cannot share someone else's report",
+    );
+    assert.equal((await one(`select count(*)::int n from public.report_shares`)).n, 0);
+  });
+  await asAnon(async () => {
+    await assert.rejects(db.query(`select * from public.report_shares`), /permission denied/);
+    const info = await one(`select * from public.get_report_share($1)`, [token]);
+    assert.equal(info.project_name, "Shared Compound");
+    assert.equal(info.language, "ar");
+    assert.equal(info.page_count, 3);
+    assert.equal((await rows(`select * from public.get_report_share($1)`, ["0".repeat(64)])).length, 0);
+    assert.equal((await rows(`select * from public.get_report_share($1)`, ["' or 1=1 --"])).length, 0);
+    const open = await one(`select * from public.open_report_share($1)`, [token]);
+    assert.equal(open.storage_path, `${A}/${inspectionId}/r.pdf`);
+  });
+  await as(A, async () => {
+    assert.equal((await one(`select view_count from public.report_shares where token = $1`, [token])).view_count, 1);
+    await assert.rejects(db.query(`update public.report_shares set expires_at = now() + interval '90 days'`), /permission denied/);
+    await db.query(`update public.report_shares set revoked_at = now() where token = $1`, [token]);
+    const un = await db.query(`update public.report_shares set revoked_at = null where token = $1`, [token]);
+    assert.equal(un.affectedRows ?? 0, 0, "revoked links stay revoked");
+  });
+  await asAnon(async () => {
+    assert.equal((await rows(`select * from public.get_report_share($1)`, [token])).length, 0);
+    assert.equal((await rows(`select * from public.open_report_share($1)`, [token])).length, 0);
+  });
+  // Expired links are dead too.
+  let expired;
+  await as(A, async () => {
+    expired = await one(
+      `insert into public.report_shares (report_id, inspection_id, expires_at) values ($1, $2, now() + interval '1 day') returning id, token`,
+      [reportId, inspectionId],
+    );
+  });
+  await db.query(`update public.report_shares set created_at = now() - interval '3 days', expires_at = now() - interval '1 second' where id = $1`, [expired.id]);
+  await asAnon(async () => {
+    assert.equal((await rows(`select * from public.get_report_share($1)`, [expired.token])).length, 0);
+  });
+  // Admin inspection list: metadata only.
+  await as(B, async () => {
+    const list = await rows(`select * from public.admin_list_inspections('shared')`);
+    assert.equal(list.length, 1);
+    assert.equal(list[0].owner_email, "a@test.dev");
+    assert.equal(list[0].reports, 1);
+    assert.ok(!("storage_path" in list[0]) && !("address" in list[0]));
+  });
+  await as(A, async () => {
+    await db.query(`delete from public.reports where id = $1`, [reportId]);
+    assert.equal((await one(`select count(*)::int n from public.report_shares`)).n, 0, "shares die with their report");
+  });
+});
+
+test("security baseline: RLS on every table, security-definer functions pin search_path", async () => {
+  const noRls = await rows(`
+    select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity`);
+  assert.deepEqual(noRls, [], "tables without RLS: " + noRls.map((r) => r.relname).join(", "));
+  const unpinned = await rows(`
+    select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.prosecdef
+       and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) c where c like 'search_path=%')`);
+  assert.deepEqual(unpinned, [], "security definer without search_path: " + unpinned.map((r) => r.proname).join(", "));
+  const views = await rows(`
+    select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public' and c.relkind = 'v'
+       and not coalesce((select option_value = 'true' from pg_options_to_table(c.reloptions) where option_name = 'security_invoker'), false)`);
+  assert.deepEqual(views, [], "views must be security_invoker: " + views.map((r) => r.relname).join(", "));
 });

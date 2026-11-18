@@ -12,6 +12,7 @@ import { getI18n } from "@/lib/i18n/server";
 import { deleteDefectAction } from "../../../../_actions/defects";
 import { PhotoGallery, PhotoUploader, ReinspectionForm } from "./client";
 import { isInspectionUnlocked } from "@/lib/billing";
+import { getCategoryLabels } from "@/lib/categories";
 
 export const metadata: Metadata = { title: "Defect" };
 
@@ -25,7 +26,7 @@ export default async function DefectPage({ params, searchParams }: PageProps<"/i
     getI18n(),
   ]);
   const room = rooms.find((r) => r.id === defect.room_id);
-  const unlocked = await isInspectionUnlocked(id);
+  const [unlocked, categoryLabels] = await Promise.all([isInspectionUnlocked(id), getCategoryLabels(lang)]);
   const planUrl = property.floor_plan_width && property.floor_plan_height ? await getPlanImageUrl(property) : null;
   const pinned = defect.plan_x !== null && defect.plan_y !== null;
   const before = photos.filter((p) => p.kind === "before");
@@ -34,7 +35,7 @@ export default async function DefectPage({ params, searchParams }: PageProps<"/i
   const facts: [string, string][] = [
     [t.defect.room, room ? roomLabel(room, t) : t.defect.noRoom],
     [t.defect.locationNote, defect.location_note],
-    [t.defect.category, categoryLabel(defect.category, t)],
+    [t.defect.category, categoryLabel(defect.category, t, categoryLabels)],
     [t.defect.identified, formatDate(defect.identified_on, lang)],
     [t.defect.responsible, defect.responsible_party],
     [t.defect.correctedOn, defect.corrected_on ? formatDate(defect.corrected_on, lang) : ""],

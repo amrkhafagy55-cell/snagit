@@ -22,8 +22,14 @@ export function roomLabel(room: Pick<Room, "room_type" | "type_index" | "name">,
   return NUMBERED_ROOMS.has(room.room_type) || room.type_index > 1 ? `${base} ${room.type_index}` : base;
 }
 
-export function categoryLabel(category: string, t: Dictionary): string {
-  return (t.categories as Record<string, string>)[category] ?? category;
+/** `labels` comes from the admin-managed categories (getCategoryLabels); the dictionary is the fallback. */
+export function categoryLabel(category: string, t: Dictionary, labels?: Record<string, string>): string {
+  return labels?.[category] ?? (t.categories as Record<string, string>)[category] ?? category;
+}
+
+/** Fills "{name}" placeholders in a dictionary string. */
+export function fill(template: string, vars: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));
 }
 
 export function itemTitle(item: Pick<ChecklistItem, "title_en" | "title_ar">, lang: Lang): string {

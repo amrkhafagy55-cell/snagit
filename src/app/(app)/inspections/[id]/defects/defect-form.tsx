@@ -7,6 +7,7 @@ import { PhotoPicker } from "@/components/photo-picker";
 import { SEVERITY_STYLES } from "@/components/badges";
 import { useErrorText, useI18n } from "@/lib/i18n/client";
 import { categoryLabel } from "@/lib/i18n";
+import { useCategories } from "@/components/category-provider";
 import { uploadDefectPhotos } from "@/lib/photos";
 import { DEFECT_STATUSES, SEVERITIES, type DefectStatus, type Severity } from "@/lib/types";
 import type { DefectInput } from "@/lib/validation";
@@ -42,6 +43,7 @@ export function DefectForm({
   storedPhotoCount?: number;
 }) {
   const { t } = useI18n();
+  const { labels } = useCategories();
   const errorText = useErrorText();
   const router = useRouter();
   const [values, setValues] = useState<Values>(initial);
@@ -234,7 +236,7 @@ export function DefectForm({
             >
               {categories.map((c) => (
                 <option key={c} value={c}>
-                  {categoryLabel(c, t)}
+                  {categoryLabel(c, t, labels)}
                 </option>
               ))}
               <option value={NEW}>{t.checklist.customCategory}</option>
